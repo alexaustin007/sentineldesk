@@ -53,7 +53,7 @@ function Column({ children }: { children: ReactNode }) {
 }
 
 function Title({ children }: { children: ReactNode }) {
-  return <h1 className="text-[24px] leading-8 font-semibold text-ink">Model metrics{children}</h1>;
+  return <h1 className="text-[24px] leading-8 font-semibold text-ink">Triage performance{children}</h1>;
 }
 
 /** Loading: the three section titles with grey placeholder lines (no spinner). */
@@ -64,7 +64,7 @@ export function MetricsLoading() {
         <Title>{null}</Title>
         <div className="mt-2 h-4 w-72 rounded bg-surface-2" />
       </div>
-      {Object.values(TITLES).map((t) => (
+      {["Urgent incidents", "Routing and timing"].map((t) => (
         <section key={t} className={SECTION}>
           <h2 className={H2}>{t}</h2>
           <div className="mt-4 space-y-3">
@@ -185,107 +185,129 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
     <Column>
       <div>
         <Title>{null}</Title>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[14px] leading-5 text-ink-3">
-          {source === "sample" && (
-            <>
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber" />
-              <span role="note" title="Real metrics not generated yet">
-                Sample data ·
-              </span>
-            </>
-          )}
-          <span>
-            {source === "sample" ? "evaluated" : "Evaluated"} on {holdout != null ? <span className="num">{int(holdout)} </span> : null}holdout tickets the
-            model never saw
-          </span>
+        <p className="mt-1 text-[15px] leading-6 text-ink-2">
+          {source === "sample" ? "Sample data" : "Evaluation results"}
+          {holdout != null && <> · {int(holdout)} test tickets</>}
         </p>
       </div>
 
-      <section aria-labelledby="m-urgent" className={SECTION}>
-        <h2 id="m-urgent" className={H2}>
-          {TITLES.urgent}
-        </h2>
-        <p className="mt-3">
-          <Hint tip={<RecallTip m={m} />} className="underline-offset-[8px]">
-            <span className="num text-[44px] leading-[48px] font-semibold text-ink">{pct(m.high_priority_incident_recall, 1)}</span>
-          </Hint>
-        </p>
+      <section aria-labelledby="summary-urgent" className={SECTION}>
+        <h2 id="summary-urgent" className={H2}>Urgent incidents flagged for on-call</h2>
+        <p className="num mt-3 text-[44px] leading-[48px] font-semibold text-ink">{pct(m.high_priority_incident_recall, 1)}</p>
         <p className="mt-1 text-[15px] leading-6 text-ink-2">
-          High-priority incident recall{c ? <> · <span className="num">{int(c.caught)} of {int(c.total)}</span> escalated to on-call</> : null}
+          {c ? <>{int(c.caught)} of {int(c.total)} urgent incidents flagged. {int(c.total - c.caught)} missed.</>
+            : "Share of urgent incidents flagged for the on-call team."}
         </p>
-        {ninety && (
-          <p className="mt-3 text-[15px] leading-6 text-ink">
-            <Hint wide tip={<TradeoffTip rows={tradeoff} ninety={ninety} />}>
-              To catch <span className="num">{pct(ninety.target_recall)}</span> of them, <span className="num">{pct(ninety.escalation_rate)}</span> of all tickets go
-              to a human.
-            </Hint>
-          </p>
-        )}
       </section>
 
-      <section aria-labelledby="m-accuracy" className={SECTION}>
-        <h2 id="m-accuracy" className={H2}>
-          {TITLES.accuracy}
-        </h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-[15px] leading-6">
-            <thead>
-              <tr>
-                <th scope="col" className="pb-2 text-left">
-                  <span className="sr-only">Prediction</span>
-                </th>
-                {cols.map((col) => (
-                  <th key={col.key} scope="col" className="pb-2 pl-6 text-right text-[13px] leading-[18px] font-medium text-ink-2">
-                    <Hint tip={<TipBody>{col.def}</TipBody>}>{col.header}</Hint>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {HEAD_NAMES.map((k) => (
-                <HeadRow key={k} name={k} h={m.heads[k]} cols={cols} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {(facts.length > 0 || mix || meta.length > 0) && (
-        <section aria-labelledby="m-sound" className={SECTION}>
-          <h2 id="m-sound" className={H2}>
-            {TITLES.sound}
-          </h2>
-          {facts.length > 0 && (
-            <dl className={`mt-3 grid grid-cols-2 gap-x-6 gap-y-5 ${facts.length > 4 ? "min-[900px]:grid-cols-5" : "min-[900px]:grid-cols-4"}`}>
-              {facts.map((f) => (
-                <div key={f.key}>
-                  <dt className={LABEL}>{f.label}</dt>
-                  <dd>
-                    <Hint wide={f.wide} tip={f.tip} className="num text-[17px] leading-6 font-medium text-ink">
-                      {f.value}
-                    </Hint>
-                  </dd>
-                </div>
-              ))}
-            </dl>
+      {(m.heads.queue.accuracy != null || p?.latency_ms) && (
+        <dl className="grid gap-6 border-t border-line pt-6 sm:grid-cols-2">
+          {m.heads.queue.accuracy != null && (
+            <div>
+              <dt className={H2}>Sent to the right team</dt>
+              <dd className="num mt-2 text-2xl font-semibold">{pct(m.heads.queue.accuracy, 1)}</dd>
+            </div>
           )}
-          {mix && (
-            <p className={`${facts.length > 0 ? "mt-6 " : "mt-3 "}flex flex-wrap items-baseline gap-x-4 text-[15px] leading-6`}>
-              <span className={LABEL}>Outcome mix</span>
-              <Hint tip={<MixTip mix={mix} n={n} />}>
-                <span className="num">
-                  <span className="text-ok-text">{pct(share(mix, "auto_draft"))} auto-draft</span>
-                  {" · "}
-                  <span className="text-rev-text">{pct(share(mix, "human_review"))} human review</span>
-                  {" · "}
-                  <span className="text-esc-text">{pct(share(mix, "escalate"))} escalated</span>
-                </span>
+          {p?.latency_ms && (
+            <div>
+              <dt className={H2}>Typical time to triage</dt>
+              <dd className="num mt-2 text-2xl font-semibold">{fmtSeconds(p.latency_ms.p50)}</dd>
+              <dd className="mt-1 text-[14px] text-ink-2">Time from ticket submission to a triage decision (median).</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
+      <details className="border-t border-line pt-5">
+        <summary className="cursor-pointer text-[15px] font-medium text-accent">Technical details</summary>
+        <div className="mt-6 flex flex-col gap-8">
+          <section aria-labelledby="m-urgent" className={SECTION}>
+            <h2 id="m-urgent" className={H2}>
+              {TITLES.urgent}
+            </h2>
+            <p className="mt-3">
+              <Hint tip={<RecallTip m={m} />} className="underline-offset-[8px]">
+                <span className="num text-[44px] leading-[48px] font-semibold text-ink">{pct(m.high_priority_incident_recall, 1)}</span>
               </Hint>
             </p>
+            <p className="mt-1 text-[15px] leading-6 text-ink-2">
+              High-priority incident recall{c ? <> · <span className="num">{int(c.caught)} of {int(c.total)}</span> escalated to on-call</> : null}
+            </p>
+            {ninety && (
+              <p className="mt-3 text-[15px] leading-6 text-ink">
+                <Hint wide tip={<TradeoffTip rows={tradeoff} ninety={ninety} />}>
+                  To catch <span className="num">{pct(ninety.target_recall)}</span> of them, <span className="num">{pct(ninety.escalation_rate)}</span> of all tickets go
+                  to a human.
+                </Hint>
+              </p>
+            )}
+          </section>
+
+          <section aria-labelledby="m-accuracy" className={SECTION}>
+            <h2 id="m-accuracy" className={H2}>
+              {TITLES.accuracy}
+            </h2>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[520px] border-collapse text-[15px] leading-6">
+                <thead>
+                  <tr>
+                    <th scope="col" className="pb-2 text-left">
+                      <span className="sr-only">Prediction</span>
+                    </th>
+                    {cols.map((col) => (
+                      <th key={col.key} scope="col" className="pb-2 pl-6 text-right text-[13px] leading-[18px] font-medium text-ink-2">
+                        <Hint tip={<TipBody>{col.def}</TipBody>}>{col.header}</Hint>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HEAD_NAMES.map((k) => (
+                    <HeadRow key={k} name={k} h={m.heads[k]} cols={cols} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {(facts.length > 0 || mix || meta.length > 0) && (
+            <section aria-labelledby="m-sound" className={SECTION}>
+              <h2 id="m-sound" className={H2}>
+                {TITLES.sound}
+              </h2>
+              {facts.length > 0 && (
+                <dl className={`mt-3 grid grid-cols-2 gap-x-6 gap-y-5 ${facts.length > 4 ? "min-[900px]:grid-cols-5" : "min-[900px]:grid-cols-4"}`}>
+                  {facts.map((f) => (
+                    <div key={f.key}>
+                      <dt className={LABEL}>{f.label}</dt>
+                      <dd>
+                        <Hint wide={f.wide} tip={f.tip} className="num text-[17px] leading-6 font-medium text-ink">
+                          {f.value}
+                        </Hint>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {mix && (
+                <p className={`${facts.length > 0 ? "mt-6 " : "mt-3 "}flex flex-wrap items-baseline gap-x-4 text-[15px] leading-6`}>
+                  <span className={LABEL}>Outcome mix</span>
+                  <Hint tip={<MixTip mix={mix} n={n} />}>
+                    <span className="num">
+                      <span className="text-ok-text">{pct(share(mix, "auto_draft"))} auto-draft</span>
+                      {" · "}
+                      <span className="text-rev-text">{pct(share(mix, "human_review"))} human review</span>
+                      {" · "}
+                      <span className="text-esc-text">{pct(share(mix, "escalate"))} escalated</span>
+                    </span>
+                  </Hint>
+                </p>
+              )}
+              {meta.length > 0 && <p className={`${mix || facts.length > 0 ? "mt-5 " : "mt-3 "}${LABEL}`}>{meta.join(" · ")}</p>}
+            </section>
           )}
-          {meta.length > 0 && <p className={`${mix || facts.length > 0 ? "mt-5 " : "mt-3 "}${LABEL}`}>{meta.join(" · ")}</p>}
-        </section>
-      )}
+        </div>
+      </details>
     </Column>
   );
 }
