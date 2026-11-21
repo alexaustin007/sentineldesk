@@ -78,6 +78,18 @@ def test_template_placeholder_is_removed() -> None:
     assert "<tel_num>" not in result.cleaned_reply
 
 
+def test_grouped_citations_are_split_and_checked() -> None:
+    evidence = REFUND_EVIDENCE + VPN_EVIDENCE
+    draft = (
+        "We confirmed the duplicate charge and issued a refund [MOCK-0005, MOCK-0002]."
+    )
+
+    result = verify_reply(draft, evidence, "en")
+
+    assert result.passed, result.issues
+    assert "[MOCK-0005] [MOCK-0002]" in result.cleaned_reply
+
+
 def test_personal_data_in_reply_fails() -> None:
     draft = (
         "Please reinstall the VPN client and restart your laptop [MOCK-0002], "

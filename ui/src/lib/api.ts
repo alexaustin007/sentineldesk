@@ -37,7 +37,9 @@ async function liveTriage(req: TriageRequest, signal: AbortSignal): Promise<Tria
   try {
     res = await fetch("/api/triage", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // A free ngrok tunnel answers browsers with an HTML warning page unless this
+      // header is present; other backends ignore it.
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify(req),
       signal,
     });
