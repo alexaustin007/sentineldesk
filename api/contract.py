@@ -95,7 +95,7 @@ def to_contract(result: TriageResult, config: TriageConfig) -> dict[str, Any]:
                 head: label_prediction(result.final_labels.head(head))
                 for head in LABEL_HEADS
             },
-            "critical_incident_risk": None,
+            "critical_incident_risk": round(result.incident_risk, 4),
             "disagreements": [
                 head
                 for head in LABEL_HEADS
@@ -111,7 +111,10 @@ def to_contract(result: TriageResult, config: TriageConfig) -> dict[str, Any]:
             "thresholds": {
                 "confidence": config.min_head_confidence,
                 "similarity": config.min_top_similarity,
-                "critical_incident_risk": None,
+                "critical_incident_risk": min(
+                    config.min_classifier_incident_score,
+                    config.min_incident_precedent_share,
+                ),
             },
         },
         "route": {"path": result.route, "reasons": result.route_reasons},
