@@ -92,3 +92,5 @@ class TriageConfig:
     # multilingual index, 95% of historical validation tickets score above 0.77,
     # short realistic tickets 0.63 to 0.85, and off-topic text 0.22 to 0.32.
     min_top_similarity: float = 0.5
+
+    independent_draft_review: bool = False
