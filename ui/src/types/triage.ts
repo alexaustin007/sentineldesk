@@ -130,6 +130,8 @@ export interface TriageInput {
   language_supported: boolean;
   /** e.g. { email: 1, phone: 1 }; {} if none. */
   pii_counts: Record<string, number>;
+  /** UI-only, set by parseTriageResponse: language_detected was absent (defaulted to "en", badge hidden). */
+  language_missing?: boolean;
 }
 
 export interface TriageResponse {

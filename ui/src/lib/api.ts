@@ -1,19 +1,12 @@
 import { pickMock } from "../mocks";
 import type { TriageErrorBody, TriageRequest, TriageResponse } from "../types/triage";
+import { parseTriageResponse, TriageError } from "./validate";
 
+export { TriageError };
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 export const TIMEOUT_MS = 30_000;
 
-export class TriageError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-/** `?mock=error` / `?mock=timeout` force the failure states in mock mode. */
+/** `?mock=error` / `?mock=timeout` / `?mock=raw` (PR #5 raw shape) force the failure states in mock mode. */
 function mockOverride(): string | null {
   return new URLSearchParams(window.location.search).get("mock");
 }
@@ -33,7 +26,10 @@ async function mockTriage(req: TriageRequest, signal: AbortSignal): Promise<Tria
   if (mode === "timeout") await wait(TIMEOUT_MS * 2, signal);
   await wait(1000 + Math.random() * 1000, signal);
   if (mode === "error") throw new TriageError("UPSTREAM_UNAVAILABLE", "The generator service did not respond (mock error).");
-  return structuredClone(pickMock(req));
+  if (mode === "raw") return parseTriageResponse({ status: "ESCALATE_IMMEDIATELY", final_labels: {}, reasons: [] });
+  const mock = structuredClone(pickMock(req));
+  // Dev builds run the mocks through the same runtime check as live responses.
+  return import.meta.env.DEV ? parseTriageResponse(mock) : mock;
 }
 
 async function liveTriage(req: TriageRequest, signal: AbortSignal): Promise<TriageResponse> {
@@ -53,7 +49,10 @@ async function liveTriage(req: TriageRequest, signal: AbortSignal): Promise<Tria
     const body = (await res.json().catch(() => null)) as TriageErrorBody | null;
     throw new TriageError(body?.error?.code ?? `HTTP_${res.status}`, body?.error?.message ?? res.statusText ?? "Request failed");
   }
-  return (await res.json()) as TriageResponse;
+  const raw: unknown = await res.json().catch(() => {
+    throw new TriageError("BAD_RESPONSE", "Backend response is not valid JSON");
+  });
+  return parseTriageResponse(raw);
 }
 
 export class TimeoutError extends Error {}

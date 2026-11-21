@@ -111,10 +111,12 @@ export function EscalationBanner({ res }: { res: TriageResponse }) {
             ))}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 border-t border-line py-1.5 pr-3 text-[12.5px] text-ink-2">
-          <span className="num">
-            <span className="text-ink-3">lang</span> {langCode(res.input?.language_detected)}
-            {res.input?.language_supported === false && <span className="text-ink-3"> (unsupported)</span>}
-          </span>
+          {!res.input?.language_missing && (
+            <span className="num">
+              <span className="text-ink-3">lang</span> {langCode(res.input?.language_detected)}
+              {res.input?.language_supported === false && <span className="text-ink-3"> (unsupported)</span>}
+            </span>
+          )}
           {route && (
             <span className="num">
               <span className="text-ink-3">route</span> {route}

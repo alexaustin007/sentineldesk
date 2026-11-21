@@ -13,7 +13,7 @@ export function ResultsPane({ run, onRetry }: { run: RunState; onRetry: () => vo
   if (run.kind === "error")
     return (
       <Failure
-        title="Triage failed"
+        title={run.code === "BAD_RESPONSE" ? "Unexpected backend response" : "Triage failed"}
         detail={run.message}
         code={run.code}
         onRetry={onRetry}

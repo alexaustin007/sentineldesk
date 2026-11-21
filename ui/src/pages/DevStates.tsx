@@ -4,6 +4,7 @@ import { ConsoleView } from "../components/ConsoleView";
 import { EntryView } from "../components/EntryView";
 import { deBilling, humanReviewDeep, injection, knowledgeGap, lowConfidence, vpnOutage } from "../mocks";
 import type { RunState } from "../lib/run";
+import { parseTriageResponse, type TriageError } from "../lib/validate";
 import type { TriageResponse } from "../types/triage";
 
 // Type-checks the frozen contract example against ui/src/types/triage.ts at build time.
@@ -25,6 +26,16 @@ interface Case {
 
 const edge = (patch: Partial<TriageResponse>, base = vpnOutage): TriageResponse => ({ ...base, ...patch });
 
+/** Runs raw JSON through the real runtime check, exactly as liveTriage does. */
+function parsed(raw: unknown): RunState {
+  try {
+    return success(parseTriageResponse(raw));
+  } catch (e) {
+    const err = e as TriageError;
+    return { kind: "error", code: err.code ?? "CLIENT", message: err.message, elapsedMs: 240 };
+  }
+}
+
 const CASES: Case[] = [
   { id: "entry", title: "Entry only (before first submit)", run: { kind: "idle" }, input: { subject: "", body: "" } },
   { id: "validation", title: "Entry · empty body validation", run: { kind: "idle" }, input: { subject: "Login issue", body: "" }, bodyError: true },
@@ -36,6 +47,43 @@ const CASES: Case[] = [
     input: vpnOutage.input,
   },
   { id: "timeout", title: "Timeout > 30 s · retry", run: { kind: "timeout", elapsedMs: 30000 }, input: vpnOutage.input },
+  {
+    id: "bad-response",
+    title: "BAD_RESPONSE · wrong-shaped JSON (parseTriageResponse)",
+    run: parsed({
+      ...vpnOutage,
+      classification: { type: { label: 3, confidence: 0.9 }, queue: { label: "Technical Support" } },
+      precedents: [{ ticket_id: "TKT-01842" }],
+      latency_ms: {},
+    }),
+    input: vpnOutage.input,
+  },
+  {
+    id: "raw-pr5-shape",
+    title: "BAD_RESPONSE · PR #5 raw TriageResult (final_labels, no classification)",
+    run: parsed({
+      status: "ESCALATE_IMMEDIATELY",
+      reasons: ["High-priority Incident"],
+      final_labels: { type: { label: "Incident", confidence: 0.91 } },
+      route: "none",
+      latency_ms: 182,
+    }),
+    input: vpnOutage.input,
+  },
+  {
+    id: "normalized",
+    title: "Minimal valid response · normalized (no escalation/guardrails/draft/route/usage/language)",
+    run: parsed({
+      classification: {
+        type: { label: "Incident", confidence: 1.4 },
+        queue: { label: "Technical Support", confidence: 0.78 },
+        priority: { label: "high", confidence: -0.2 },
+      },
+      precedents: [{ ticket_id: "TKT-01842", similarity: 0.83, type: "Incident", queue: "Technical Support", priority: "high", answer_snippet: "Rolled back the gateway firmware." }],
+      latency_ms: { total: 210 },
+    }),
+    input: vpnOutage.input,
+  },
   { id: "a", title: "A · Escalate (red) · VPN outage, draft: null", run: success(vpnOutage) },
   { id: "b", title: "B · Auto-draft (green) · German billing", run: success(deBilling) },
   { id: "c", title: "C · Human review (amber) · knowledge gap · no subject", run: success(knowledgeGap) },

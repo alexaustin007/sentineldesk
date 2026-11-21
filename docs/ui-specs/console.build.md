@@ -203,3 +203,25 @@ Follows UI_WORKFLOW §4.1, tweaks row "Expandable precedents with full evidence"
   - `#c` and `#e`: the fallbacks.
 
   Typecheck and build pass. Screenshots have the `v5-` prefix. No review loop.
+
+## Runtime check of the backend response (team request)
+
+- **`ui/src/lib/validate.ts`** (hand-written, no library, F3): `parseTriageResponse(raw)`. `TriageError` now lives here and `api.ts` re-exports it. The file has no runtime imports, so Node can run its test directly.
+  - **Required:** `classification.{type,queue,priority}.label` (string) and `.confidence` (number); `precedents` (array, each item with a string `ticket_id` and a numeric `similarity`); `latency_ms.total` (number). Anything missing throws `BAD_RESPONSE` "Backend response missing or invalid: <every bad path>".
+  - **PR #5 raw shape:** if a `final_labels` key is present, it throws "Backend returned PR #5's raw TriageResult; the API wrapper must convert it (docs/UI_WORKFLOW.md §3.2)".
+  - **Normalized instead of failing:**
+    - A missing or unknown `escalation` / `status` becomes `escalate`, with an `OTHER` reason "Backend sent no escalation decision; treated as escalate" placed before any backend reasons.
+    - `reasons` → `[]`; `thresholds` → 0.55 / 0.45 / null.
+    - `guardrails` flags and lists → `false` / `[]`; `draft` → `null`.
+    - `input.language_detected` → `"en"`, with a UI-only `language_missing` flag that hides the lang badge.
+    - `route` → `none`, `usage` → omitted, `disagreements` → `[]`.
+    - Confidences and the risk score are clamped to 0–1.
+  - The file came out at 95 lines, over the 40–60 asked for, because it normalizes every optional field explicitly.
+- **Wiring:**
+  - `liveTriage` parses `res.json()` through the validator; a non-JSON body becomes `BAD_RESPONSE` too.
+  - In dev builds (`import.meta.env.DEV`) the mock path goes through it as well.
+  - New `/?mock=raw` returns the PR #5 raw shape, for demo testing.
+- **Error state:** the existing error pane (A3) shows the message, the `BAD_RESPONSE` code and Retry, with the title "Unexpected backend response".
+- **`/dev/states`:** `#bad-response` (wrong types, every path listed), `#raw-pr5-shape` and `#normalized` (a minimal valid response: red escalate with the OTHER reason, no lang badge, confidences clamped). All three run through the real validator.
+- **Test:** `node ui/src/lib/validate.test.ts` (Node ≥ 22.18 strips types; no framework, no `tsx`) runs 12 checks: the contract example, the raw shape, path listing, non-object body, normalization defaults, unknown status, and all 6 mocks. All pass. The test is excluded from `tsc` in `ui/tsconfig.json` because it uses `node:assert`.
+- **Verified:** typecheck and build pass. At 1440 px, `/?mock=raw` on the console shows the error with Retry; `#bad-response`, `#raw-pr5-shape` and `#normalized` render as described. Screenshots have the `v6-` prefix. No review loop.
