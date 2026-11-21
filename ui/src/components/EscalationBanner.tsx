@@ -86,7 +86,7 @@ export function EscalationBanner({ res }: { res: TriageResponse }) {
               <p className="mt-2 text-[16px] text-ink">{fallbackLine}</p>
             )}
             {escalated && res.classification?.queue?.label && (
-              <p className="mt-1.5 text-[14.5px] text-ink-2">Paging {res.classification.queue.label} on-call</p>
+              <p className="mt-1.5 text-[14.5px] text-ink-2">Recommended handoff to {res.classification.queue.label} on-call</p>
             )}
             {unique.map((e) => (
               <p key={e} className="mt-3 border-l-2 border-line-strong pl-3 text-[14.5px] text-ink-2 italic">

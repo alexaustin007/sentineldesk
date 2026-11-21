@@ -155,7 +155,7 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
   const mix = p?.status_mix;
   const n = p?.tickets ?? holdout ?? null;
   const cost = fmtCost(p?.avg_cost_usd);
-  const overlaps = m.split?.leakage_check?.match(/^(\d[\d,]*)\s+of\b/)?.[1];
+  const overlapNote = m.split?.leakage_detail || m.split?.leakage_check;
   const d = m.drafts;
   const draftHeadline = d
     ? d.citations_valid_rate != null
@@ -169,13 +169,6 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
 
   const facts: { key: string; label: string; value: string; tip: ReactNode; wide?: boolean }[] = [];
   if (holdout != null) facts.push({ key: "holdout", label: "Holdout", value: `${int(holdout)} tickets`, tip: <SplitTip m={m} /> });
-  if (m.split?.leakage_check || m.split?.leakage_detail)
-    facts.push({
-      key: "leak",
-      label: "Leakage check",
-      value: overlaps != null ? `${overlaps} overlap${overlaps === "1" ? "" : "s"}` : "Checked",
-      tip: <LeakTip m={m} />,
-    });
   if (p?.latency_ms) facts.push({ key: "lat", label: "Median latency", value: fmtSeconds(p.latency_ms.p50), tip: <LatencyTip p={p} />, wide: true });
   if (cost) facts.push({ key: "cost", label: "Cost per ticket", value: cost, tip: <CostTip m={m} />, wide: true });
   if (draftHeadline && d) facts.push({ key: "draft", label: "Draft quality", value: draftHeadline, tip: <DraftTip d={d} /> });
@@ -271,7 +264,7 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
             </div>
           </section>
 
-          {(facts.length > 0 || mix || meta.length > 0) && (
+          {(facts.length > 0 || overlapNote || mix || meta.length > 0) && (
             <section aria-labelledby="m-sound" className={SECTION}>
               <h2 id="m-sound" className={H2}>
                 {TITLES.sound}
@@ -290,6 +283,7 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
                   ))}
                 </dl>
               )}
+              {overlapNote && <p className="mt-4 text-[14px] text-ink-2"><strong>Evaluation data overlap.</strong> {overlapNote}</p>}
               {mix && (
                 <p className={`${facts.length > 0 ? "mt-6 " : "mt-3 "}flex flex-wrap items-baseline gap-x-4 text-[15px] leading-6`}>
                   <span className={LABEL}>Outcome mix</span>
@@ -433,16 +427,6 @@ function SplitTip({ m }: { m: Metrics }) {
           <span className="num font-medium">{int(s.holdout)}</span> · scored here, never trained on or indexed
         </TipKV>
       )}
-    </TipBody>
-  );
-}
-
-function LeakTip({ m }: { m: Metrics }) {
-  const s = m.split!;
-  return (
-    <TipBody title="Leakage check">
-      {s.leakage_check && <TipLine>{s.leakage_check}.</TipLine>}
-      {s.leakage_detail && <TipLine>{s.leakage_detail}</TipLine>}
     </TipBody>
   );
 }
