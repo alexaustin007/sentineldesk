@@ -25,33 +25,39 @@ class ProbabilisticModel(Protocol):
 
     classes_: Sequence[Any]
 
-    def predict_proba(self, texts: Sequence[str]) -> Any: ...
+    def predict_proba(self, inputs: Sequence[Any]) -> Any: ...
+
+
+def ticket_record(subject: str, body: str) -> dict[str, str]:
+    """One ticket in the input format of the team's `make_ticket_features()` pipeline."""
+    return {"subject": subject, "body": body}
 
 
 class SklearnClassifierAdapter:
     """Wrap one fitted model per head so it satisfies `TicketClassifier`.
 
-    `build_text` must match how the models were trained. The default joins the
-    subject and body with a newline and skips a missing subject.
+    `build_input` must match what the models were trained on. The default sends a
+    {"subject", "body"} record, like the team's feature pipeline. Pass
+    `build_input=ticket_text` for models trained on plain strings.
     """
 
     def __init__(
         self,
         models_by_head: Mapping[str, ProbabilisticModel],
-        build_text: Callable[[str, str], str] = ticket_text,
+        build_input: Callable[[str, str], Any] = ticket_record,
     ) -> None:
         missing_heads = [head for head in LABEL_HEADS if head not in models_by_head]
         if missing_heads:
             raise ValueError(f"Missing models for heads: {missing_heads}")
         self._models_by_head = dict(models_by_head)
-        self._build_text = build_text
+        self._build_input = build_input
 
     def predict(self, subject: str, body: str) -> TicketLabels:
-        text = self._build_text(subject, body)
+        model_input = self._build_input(subject, body)
         distributions = {}
         for head in LABEL_HEADS:
             model = self._models_by_head[head]
-            probabilities = model.predict_proba([text])[0]
+            probabilities = model.predict_proba([model_input])[0]
             distributions[head] = LabelDistribution(
                 {
                     str(label): float(probability)
