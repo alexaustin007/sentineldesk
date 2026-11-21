@@ -88,6 +88,26 @@ ok("injection mock matches PR #5's early return (screening before routing, draft
   assert.ok(r.latency_ms.total < 500);
 });
 
+const { findCitations } = await import("./citations.ts");
+ok("citations: plain and prefixed IDs are extracted; malformed ones are not", () => {
+  const text = "See [TKT-01842], also [TKT-V5-00042] and [TKT-A1-B2-12345]; not [TKT-1], [TKT-V5-1], TKT-01842 or [tkt-01842].";
+  assert.deepEqual(
+    findCitations(text).map((c) => c.id),
+    ["TKT-01842", "TKT-V5-00042", "TKT-A1-B2-12345"],
+  );
+  const c = findCitations(text)[1];
+  assert.equal(text.slice(c.index, c.index + c.length), "[TKT-V5-00042]");
+});
+
+ok("every citation in every mock draft resolves to a precedent (except the deliberate bad one) and a TKT-V5 ID is covered", async () => {
+  const { deBilling } = await import("../mocks/deBilling.ts");
+  const ids = new Set(deBilling.precedents.map((p) => p.ticket_id));
+  const cited = findCitations(deBilling.draft!.text).map((c) => c.id);
+  assert.deepEqual(cited, deBilling.draft!.citations);
+  assert.ok(cited.every((id) => ids.has(id)));
+  assert.ok(cited.some((id) => id.startsWith("TKT-V5-")), "deBilling cites a TKT-V5 precedent");
+});
+
 // --- metrics.json ---
 const { parseMetrics, MetricsError } = await import("./validateMetrics.ts");
 const metrics = JSON.parse(readFileSync(new URL("../../../contracts/metrics.example.json", import.meta.url), "utf8"));
@@ -149,6 +169,33 @@ ok("malformed hover fields are dropped, not fatal", () => {
   const m = parseMetrics({ ...metrics, high_priority_incident: { caught: "x", total: 0 }, escalation_tradeoff: [{ target_recall: 0.9, escalation_rate: 0.2, precision: "?" }] });
   assert.equal(m.high_priority_incident, null);
   assert.equal(m.escalation_tradeoff![0].precision, undefined);
+});
+
+const { mostConfused } = await import("./metricsText.ts");
+ok("most often confused comes from the largest off-diagonal cell", () => {
+  const m = parseMetrics(metrics);
+  const t = mostConfused(m.heads.type);
+  assert.deepEqual(t, { from: "Problem", to: "Incident", count: 138 });
+  assert.equal(mostConfused({ labels: ["a", "b"], per_class: [], macro_f1: 1, confusion: [[5, 0], [0, 7]] }), null);
+});
+
+ok("calibration, language split and draft quality: kept when valid, dropped when not", () => {
+  const m = parseMetrics(metrics);
+  for (const h of ["type", "queue", "priority"] as const) {
+    const head = m.heads[h];
+    assert.equal(typeof head.calibration_error, "number");
+    const l = head.macro_f1_by_language!;
+    // English and German scores bracket the overall macro-F1.
+    assert.ok(Math.min(l.en, l.de) <= head.macro_f1 && head.macro_f1 <= Math.max(l.en, l.de), `${h} language split brackets macro-F1`);
+  }
+  assert.equal(typeof m.calibration_error, "number");
+  assert.equal(m.drafts, null); // null in the example
+  const withDrafts = parseMetrics({ ...metrics, drafts: { citations_valid_rate: 0.97, language_match_rate: null, removed_claims_rate: 0.04 } });
+  assert.deepEqual(withDrafts.drafts, { citations_valid_rate: 0.97, language_match_rate: null, removed_claims_rate: 0.04 });
+  assert.equal(parseMetrics({ ...metrics, drafts: { citations_valid_rate: null, language_match_rate: null, removed_claims_rate: null } }).drafts, null);
+  const bad = parseMetrics({ ...metrics, heads: { ...metrics.heads, type: { ...metrics.heads.type, calibration_error: "low", macro_f1_by_language: { en: 0.8 } } } });
+  assert.equal(bad.heads.type.calibration_error, undefined);
+  assert.equal(bad.heads.type.macro_f1_by_language, undefined);
 });
 
 ok("missing optional parts are dropped, not fatal", () => {

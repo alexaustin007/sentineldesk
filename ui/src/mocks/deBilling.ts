@@ -33,7 +33,7 @@ export const deBilling: TriageResponse = {
   },
   precedents: [
     {
-      ticket_id: "TKT-12093",
+      ticket_id: "TKT-V5-12093",
       body: "Hallo, mein Abo für Oktober wurde zweimal von meiner Kreditkarte abgebucht. Ich habe beide Buchungen in der Abrechnung gesehen. Bitte prüfen Sie das und erstatten Sie den doppelten Betrag.\n\nVielen Dank\nM. Keller",
       answer: "Guten Tag Frau Keller, wir haben die doppelte Abbuchung für Oktober bestätigt und die zweite Transaktion storniert. Die Gutschrift erscheint in 3–5 Werktagen auf Ihrer Karte. Die Ursache war ein Zahlungs-Retry nach einer kurzen Störung unseres Zahlungsanbieters; wir haben den Retry für Ihr Konto deaktiviert, damit das nicht erneut passiert. Mit freundlichen Grüßen, Ihr Support-Team",
       similarity: 0.92,
@@ -73,8 +73,8 @@ export const deBilling: TriageResponse = {
   ],
   draft: {
     language: "de",
-    text: "Guten Tag, vielen Dank für Ihre Nachricht. Wie in vergleichbaren Fällen [TKT-12093] prüfen wir die doppelte Abbuchung für November und stornieren die zweite Transaktion, sobald sie bestätigt ist. Die Gutschrift erscheint in der Regel innerhalb von 3–5 Werktagen auf Ihrer Karte [TKT-40766]. Mit freundlichen Grüßen, Ihr Support-Team",
-    citations: ["TKT-12093", "TKT-40766"],
+    text: "Guten Tag, vielen Dank für Ihre Nachricht. Wie in vergleichbaren Fällen [TKT-V5-12093] prüfen wir die doppelte Abbuchung für November und stornieren die zweite Transaktion, sobald sie bestätigt ist. Die Gutschrift erscheint in der Regel innerhalb von 3–5 Werktagen auf Ihrer Karte [TKT-40766]. Mit freundlichen Grüßen, Ihr Support-Team",
+    citations: ["TKT-V5-12093", "TKT-40766"],
   },
   latency_ms: { total: 1620, guardrails: 7, classifier: 11, retrieval: 142, draft_reply: 1391, verification: 69 },
   usage: { total_tokens: 846, estimated_cost_usd: 0.0004 },
