@@ -2,8 +2,9 @@
 .venv/
 .env
 
-# Organizer dataset and generated artifacts stay local
-data/
+# Organizer dataset, CSV files, and generated artifacts stay local
+/data/
+*.[Cc][Ss][Vv]
 artifacts/
 
 # Python and tool caches
