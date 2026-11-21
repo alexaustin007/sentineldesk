@@ -21,7 +21,10 @@ export async function loadMetrics(signal?: AbortSignal): Promise<LoadedMetrics> 
     if (signal?.aborted) throw e;
   }
   const isJson = res?.ok && (res.headers.get("content-type") ?? "").includes("json");
-  if (!res || !isJson) return { metrics: parseMetrics(example), source: "sample" };
+  if (!res || !isJson) {
+    if (import.meta.env.PROD && import.meta.env.VITE_USE_MOCK !== "true") throw new Error("Holdout evaluation unavailable");
+    return { metrics: parseMetrics(example), source: "sample" };
+  }
   const raw: unknown = await res.json().catch(() => "not json");
   const metrics = parseMetrics(raw);
   return { metrics, source: metrics.sample ? "sample" : "live" };

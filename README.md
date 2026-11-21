@@ -188,3 +188,9 @@ X_new = features.transform([{"body": "Mein VPN funktioniert nicht."}])
 The pipeline combines the optional subject with the body and returns a sparse matrix of word and two-word phrase weights. Reuse the same matrix with the type, queue, and priority labels. For validation, split the historical rows first and fit on the training portion only. Use `transform()` for validation, holdout inputs, and live tickets. For cross-validation, put this unfitted pipeline before the classifier in a scikit-learn pipeline so each fold learns its own vocabulary.
 
 Save the fitted pipeline locally alongside the matching classifiers (for example, `joblib.dump(features, "data/prepared/ticket_features.joblib")` after importing `joblib`). Load that same pipeline for inference.
+
+### Publish the classifier holdout benchmark
+
+From the repo root, run `python -m scripts.evaluate_holdout` after preparing the full split. It fits the team's classifier on the historical training set, predicts from holdout subject and body, then joins the hidden labels by ticket ID to score predictions. The generated `ui/public/metrics.json` contains only aggregate counts and scores. Build the frontend after generating the report so Vite includes it.
+
+For the Vercel demo, build with `VITE_USE_MOCK=false` and deploy the contents of `ui/dist/` with the rewrites in `ui/vercel.json`. The backend laptop and its tunnel must stay online. The Metrics page shows the last successful live decision in the current tab. Its classifier benchmark updates when a new evaluation report is published.

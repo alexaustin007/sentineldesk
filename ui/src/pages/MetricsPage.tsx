@@ -144,6 +144,7 @@ const COLS: Col[] = [
 
 /** Three sections titled by the question they answer; exact numbers are one hover or focus away. */
 export function MetricsView({ metrics: m, source }: LoadedMetrics) {
+  const classifierOnly = m.evaluation_scope === "classifier";
   const holdout = m.split?.holdout;
   const c = m.high_priority_incident;
   const tradeoff = [...(m.escalation_tradeoff ?? [])].sort((a, b) => a.target_recall - b.target_recall);
@@ -186,13 +187,13 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
       <div>
         <Title>{null}</Title>
         <p className="mt-1 text-[15px] leading-6 text-ink-2">
-          {source === "sample" ? "Sample data" : "Evaluation results"}
+          {source === "sample" ? "Sample data" : classifierOnly ? "Classifier benchmark" : "Evaluation results"}
           {holdout != null && <> · {int(holdout)} test tickets</>}
         </p>
       </div>
 
       <section aria-labelledby="summary-urgent" className={SECTION}>
-        <h2 id="summary-urgent" className={H2}>Urgent incidents flagged for on-call</h2>
+        <h2 id="summary-urgent" className={H2}>{classifierOnly ? "Urgent incidents identified by the classifier" : "Urgent incidents flagged for on-call"}</h2>
         <p className="num mt-3 text-[44px] leading-[48px] font-semibold text-ink">{pct(m.high_priority_incident_recall, 1)}</p>
         <p className="mt-1 text-[15px] leading-6 text-ink-2">
           {c ? <>{int(c.caught)} of {int(c.total)} urgent incidents flagged. {int(c.total - c.caught)} missed.</>
@@ -204,7 +205,7 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
         <dl className="grid gap-6 border-t border-line pt-6 sm:grid-cols-2">
           {m.heads.queue.accuracy != null && (
             <div>
-              <dt className={H2}>Sent to the right team</dt>
+              <dt className={H2}>{classifierOnly ? "Correct team predicted" : "Sent to the right team"}</dt>
               <dd className="num mt-2 text-2xl font-semibold">{pct(m.heads.queue.accuracy, 1)}</dd>
             </div>
           )}
@@ -231,7 +232,7 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
               </Hint>
             </p>
             <p className="mt-1 text-[15px] leading-6 text-ink-2">
-              High-priority incident recall{c ? <> · <span className="num">{int(c.caught)} of {int(c.total)}</span> escalated to on-call</> : null}
+              High-priority incident recall{c ? <> · <span className="num">{int(c.caught)} of {int(c.total)}</span> {classifierOnly ? "identified" : "escalated to on-call"}</> : null}
             </p>
             {ninety && (
               <p className="mt-3 text-[15px] leading-6 text-ink">
@@ -341,7 +342,7 @@ function RecallTip({ m }: { m: Metrics }) {
   const total = m.split?.holdout;
   return (
     <TipBody>
-      <TipLine>Of holdout tickets that are priority high and type Incident, the share the gate escalated to on-call.</TipLine>
+      <TipLine>{m.evaluation_scope === "classifier" ? "Share of urgent incidents correctly classified as both high priority and Incident." : "Of holdout tickets that are priority high and type Incident, the share the gate escalated to on-call."}</TipLine>
       {c && (
         <TipKV k="Caught">
           <span className="num font-medium">
