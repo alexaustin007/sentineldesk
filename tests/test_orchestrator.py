@@ -6,6 +6,7 @@ from dataclasses import replace
 from samples import PASSWORD_BODY, PASSWORD_SUBJECT, TEST_CONFIG, OrchestratorFactory
 
 from sentineldesk.classifier_interface import labels_from_choices
+from sentineldesk.guardrails import MAX_BODY_CHARACTERS
 from sentineldesk.llm import (
     LLMRequest,
     LLMUnavailableError,
@@ -16,6 +17,7 @@ from sentineldesk.schemas import (
     AUTO_DRAFT_READY,
     ESCALATE_IMMEDIATELY,
     HUMAN_REVIEW,
+    Attachment,
     TicketLabels,
 )
 
@@ -28,6 +30,11 @@ class FixedClassifier:
 
     def predict(self, subject: str, body: str) -> TicketLabels:
         return self.labels
+
+
+class InvalidClassifier:
+    def predict(self, subject: str, body: str) -> TicketLabels:
+        raise ValueError("probabilities contain NaN")
 
 
 def reviewer_returning(verdict: dict[str, object]) -> MockLLMProvider:
@@ -54,9 +61,13 @@ def test_routine_ticket_takes_fast_path(make_orchestrator: OrchestratorFactory) 
     assert result.status == AUTO_DRAFT_READY, (
         result.reasons + result.verification_issues
     )
-    assert [call.tier for call in result.llm_calls] == ["fast"]
+    assert [call.task for call in result.llm_calls] == [
+        "draft_reply",
+        "grounding_review",
+    ]
+    assert [call.tier for call in result.llm_calls] == ["fast", "deep"]
     assert "[MOCK-0003]" in result.draft_reply
-    json.dumps(result.to_dict())  # the UI and logs need plain JSON
+    json.dumps(result.to_dict())  # the UI needs plain JSON
 
 
 def test_missing_subject_still_triages(make_orchestrator: OrchestratorFactory) -> None:
@@ -113,6 +124,7 @@ def test_weak_evidence_cannot_vote_or_escalate(
     )
 
     assert result.rag_labels is None
+    assert result.precedents == []
     assert not any("precedent vote" in reason for reason in result.reasons)
 
 
@@ -141,6 +153,7 @@ def test_disagreement_triggers_adversarial_review(
     assert [call.task for call in result.llm_calls] == [
         "adversarial_review",
         "draft_reply",
+        "grounding_review",
     ]
     assert {call.tier for call in result.llm_calls} == {"deep"}
 
@@ -208,6 +221,8 @@ def test_failed_review_never_auto_approves(
 
     assert result.status == HUMAN_REVIEW
     assert any("review unavailable" in reason for reason in result.reasons)
+    assert result.llm_calls == []
+    assert result.draft_reply is None
 
 
 def test_weak_evidence_means_no_draft(make_orchestrator: OrchestratorFactory) -> None:
@@ -219,6 +234,7 @@ def test_weak_evidence_means_no_draft(make_orchestrator: OrchestratorFactory) ->
 
     assert result.status == HUMAN_REVIEW
     assert result.draft_reply is None
+    assert result.llm_calls == []
     assert any("No close historical precedent" in reason for reason in result.reasons)
 
 
@@ -233,3 +249,104 @@ def test_unsupported_commitment_request_needs_human(
 
     assert result.status == HUMAN_REVIEW
     assert any("SLA or guarantee" in reason for reason in result.reasons)
+    assert result.llm_calls == []
+
+
+def test_low_raw_classifier_confidence_stops_before_llm(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    uncertain = FixedClassifier(
+        labels_from_choices("Request", "IT Support", "low", confidence=0.54)
+    )
+
+    result = make_orchestrator(classifier=uncertain).triage(
+        PASSWORD_SUBJECT, PASSWORD_BODY
+    )
+
+    assert result.status == HUMAN_REVIEW
+    assert result.llm_calls == []
+    assert any("Low classifier confidence" in reason for reason in result.reasons)
+
+
+def test_oversized_input_stops_before_all_models(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    result = make_orchestrator().triage("Huge ticket", "x" * (MAX_BODY_CHARACTERS + 1))
+
+    assert result.status == HUMAN_REVIEW
+    assert result.classifier_labels.source == "not_run"
+    assert result.precedents == []
+    assert result.llm_calls == []
+    assert "BODY_TOO_LONG" in result.security_events
+
+
+def test_independent_grounding_rejection_never_auto_approves(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    def respond(request: LLMRequest) -> str:
+        if request.task == "grounding_review":
+            return json.dumps(
+                {
+                    "grounded": False,
+                    "valid_citations": True,
+                    "unsupported_claims": ["Invented step"],
+                    "recommend_escalation": True,
+                    "rationale": "The cited resolution does not support every claim.",
+                }
+            )
+        return default_mock_responder(request)
+
+    result = make_orchestrator(provider=MockLLMProvider(responder=respond)).triage(
+        PASSWORD_SUBJECT, PASSWORD_BODY
+    )
+
+    assert result.status == HUMAN_REVIEW
+    assert result.grounding_review is not None
+    assert result.grounding_review["grounded"] is False
+    assert any("grounding review rejected" in reason for reason in result.reasons)
+
+
+def test_unavailable_grounding_reviewer_fails_closed(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    def respond(request: LLMRequest) -> str:
+        if request.task == "grounding_review":
+            raise LLMUnavailableError("provider diagnostics must stay private")
+        return default_mock_responder(request)
+
+    result = make_orchestrator(provider=MockLLMProvider(responder=respond)).triage(
+        PASSWORD_SUBJECT, PASSWORD_BODY
+    )
+
+    assert result.status == HUMAN_REVIEW
+    assert [call.task for call in result.llm_calls] == ["draft_reply"]
+    assert result.reasons == ["Independent grounding review unavailable"]
+    assert "provider diagnostics" not in " ".join(result.reasons)
+
+
+def test_invalid_classifier_output_fails_closed_without_llm(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    result = make_orchestrator(classifier=InvalidClassifier()).triage(
+        PASSWORD_SUBJECT, PASSWORD_BODY
+    )
+
+    assert result.status == HUMAN_REVIEW
+    assert result.llm_calls == []
+    assert "MODEL_OUTPUT_INVALID" in result.security_events
+    assert "probabilities contain NaN" not in " ".join(result.reasons)
+
+
+def test_invalid_attachment_stops_before_all_models(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    result = make_orchestrator().triage(
+        PASSWORD_SUBJECT,
+        PASSWORD_BODY,
+        attachments=[Attachment(b"malicious", "image/png")],
+    )
+
+    assert result.status == HUMAN_REVIEW
+    assert result.classifier_labels.source == "not_run"
+    assert result.llm_calls == []
+    assert "ATTACHMENT_SIGNATURE_MISMATCH" in result.security_events

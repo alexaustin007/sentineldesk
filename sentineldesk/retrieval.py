@@ -174,6 +174,11 @@ class PrecedentIndex:
             directory / "tickets.jsonl", orient="records", lines=True, dtype=False
         )
         embedder = joblib.load(directory / "embedder.joblib")
+        if index.ntotal != len(tickets):
+            raise ValueError(
+                "Saved FAISS index and ticket metadata have different row counts. "
+                "Rebuild the precedent index."
+            )
         return cls(tickets, embedder, index)
 
     def _precedent(self, row: int, similarity: float) -> Precedent:

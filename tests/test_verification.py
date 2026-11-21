@@ -88,3 +88,71 @@ def test_personal_data_in_reply_fails() -> None:
 
     assert not result.passed
     assert any("email" in issue for issue in result.issues)
+
+
+def test_historical_personal_data_must_not_be_copied_to_reply() -> None:
+    evidence = [
+        make_precedent(
+            "MOCK-0099",
+            "Email admin@example.com after reinstalling the VPN client.",
+        )
+    ]
+    draft = "Email admin@example.com after reinstalling the VPN client. [MOCK-0099]"
+
+    result = verify_reply(draft, evidence, "en")
+
+    assert not result.passed
+    assert any("email" in issue for issue in result.issues)
+
+
+def test_empty_draft_fails_closed() -> None:
+    result = verify_reply("   \n", VPN_EVIDENCE, "en")
+
+    assert not result.passed
+    assert "Draft reply is empty" in result.issues
+    assert result.cleaned_reply == ""
+
+
+def test_uncited_actionable_sentence_is_removed() -> None:
+    draft = (
+        "Hello,\n\nPlease reinstall the VPN client. [MOCK-0002] "
+        "Then restart your laptop.\n\nBest regards"
+    )
+
+    result = verify_reply(draft, VPN_EVIDENCE, "en")
+
+    assert not result.passed
+    assert result.removed_claims == ["Then restart your laptop."]
+    assert any("no retrieved citation" in issue for issue in result.issues)
+
+
+def test_thank_you_prefix_cannot_hide_an_uncited_action() -> None:
+    draft = "Restart the VPN client. [MOCK-0002] Thank you for deleting the database."
+
+    result = verify_reply(draft, VPN_EVIDENCE, "en")
+
+    assert not result.passed
+    assert "Thank you for deleting the database." in result.removed_claims
+
+
+def test_lowercase_action_cannot_borrow_previous_sentence_citation() -> None:
+    draft = "Restart the VPN client. [MOCK-0002] then delete the database."
+
+    result = verify_reply(draft, VPN_EVIDENCE, "en")
+
+    assert not result.passed
+    assert "then delete the database." in result.removed_claims
+
+
+def test_valid_but_unrelated_citation_does_not_support_refund() -> None:
+    evidence = [*VPN_EVIDENCE, *REFUND_EVIDENCE]
+    draft = (
+        "Please reinstall the VPN client. [MOCK-0002] "
+        "We will issue a refund. [MOCK-0002]"
+    )
+
+    result = verify_reply(draft, evidence, "en")
+
+    assert not result.passed
+    assert "We will issue a refund. [MOCK-0002]" in result.removed_claims
+    assert any("unsupported refund or compensation" in issue for issue in result.issues)

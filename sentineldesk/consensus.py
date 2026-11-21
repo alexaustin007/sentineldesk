@@ -1,45 +1,42 @@
-"""Double-agent consensus: blend the classifier with the RAG vote, list disagreements."""
+"""Compare classifier predictions with independent historical evidence."""
 
 from collections.abc import Sequence
-from dataclasses import replace
 
-from sentineldesk.config import LABEL_HEADS
 from sentineldesk.schemas import LabelDistribution, TicketLabels
 
 
 def blend_predictions(
     classifier_labels: TicketLabels,
     rag_labels: TicketLabels | None,
-    classifier_weight: float,
+    classifier_weight: float | None = None,
 ) -> TicketLabels:
-    """Weighted average of the two agents' probabilities for each head.
+    """Return the authoritative classifier predictions unchanged.
 
-    Without precedents the classifier stands alone. `find_disagreements` flags
-    the missing evidence separately.
+    This compatibility wrapper intentionally does *not* blend the distributions.
+    Calibrated classifier probabilities and similarity-weighted RAG vote shares
+    have different meanings, so averaging them creates a score that is neither.
+    Keep ``rag_labels`` as a separate evidence signal and use
+    :func:`find_disagreements` to compare the two branches.
+
+    ``classifier_weight`` remains temporarily accepted so older callers fail
+    safely while migrating; its value has no effect.
     """
-    if rag_labels is None:
-        return replace(classifier_labels, source="combined")
-    distributions = {
-        head: blend_distributions(
-            classifier_labels.head(head), rag_labels.head(head), classifier_weight
-        )
-        for head in LABEL_HEADS
-    }
-    return TicketLabels(source="combined", **distributions)
+    _ = rag_labels, classifier_weight
+    return classifier_labels
 
 
 def blend_distributions(
-    first: LabelDistribution, second: LabelDistribution, first_weight: float
+    first: LabelDistribution,
+    second: LabelDistribution,
+    first_weight: float | None = None,
 ) -> LabelDistribution:
-    """Mix two distributions; labels missing from one count as probability 0."""
-    labels = sorted(set(first.probabilities) | set(second.probabilities))
-    blended = {
-        label: first_weight * first.probabilities.get(label, 0.0)
-        + (1 - first_weight) * second.probabilities.get(label, 0.0)
-        for label in labels
-    }
-    ranked = sorted(blended.items(), key=lambda item: item[1], reverse=True)
-    return LabelDistribution(dict(ranked))
+    """Compatibility wrapper that preserves the calibrated distribution.
+
+    New code should keep ``second`` visible as a separate RAG vote rather than
+    calling this function.
+    """
+    _ = second, first_weight
+    return first
 
 
 def find_disagreements(

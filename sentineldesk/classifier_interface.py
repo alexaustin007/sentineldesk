@@ -5,6 +5,7 @@ expects, an adapter for scikit-learn style models, and a keyword mock for
 development. It does not train anything.
 """
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Protocol
@@ -76,14 +77,30 @@ class SklearnClassifierAdapter:
         distributions = {}
         for head in LABEL_HEADS:
             model = self._models_by_head[head]
-            probabilities = model.predict_proba([model_input])[0]
+            probabilities = [
+                float(probability)
+                for probability in model.predict_proba([model_input])[0]
+            ]
             distributions[head] = LabelDistribution(
-                {
-                    str(label): float(probability)
-                    for label, probability in zip(model.classes_, probabilities)
-                }
+                _validate_probabilities(head, model.classes_, probabilities)
             )
         return TicketLabels(source="classifier", **distributions)
+
+
+def _validate_probabilities(
+    head: str, classes: Sequence[Any], probabilities: Sequence[float]
+) -> dict[str, float]:
+    """Reject corrupt model output instead of making an unsafe policy decision."""
+    if len(classes) != len(probabilities) or not probabilities:
+        raise ValueError(f"{head} classifier returned a malformed probability vector")
+    if any(not math.isfinite(value) or value < 0.0 for value in probabilities):
+        raise ValueError(f"{head} classifier returned invalid probabilities")
+    total = sum(probabilities)
+    if not math.isclose(total, 1.0, rel_tol=1e-4, abs_tol=1e-6):
+        raise ValueError(f"{head} classifier probabilities sum to {total:.6f}, not 1.0")
+    return {
+        str(label): probability for label, probability in zip(classes, probabilities)
+    }
 
 
 # (keywords, type, queue, priority), checked in order. The first match wins.

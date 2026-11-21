@@ -66,7 +66,10 @@ def run_adversarial_review(
         [
             format_ticket(screening),
             "",
-            f"Proposed triage (blend of both agents): {format_labels(combined_labels)}",
+            (
+                "Current policy labels (classifier-authoritative; RAG remains a "
+                f"separate signal): {format_labels(combined_labels)}"
+            ),
             f"Agent 1, external classifier: {format_labels(classifier_labels)}",
             f"Agent 2, historical precedent vote: {format_labels(rag_labels)}",
             "",

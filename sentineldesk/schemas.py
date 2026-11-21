@@ -31,8 +31,10 @@ def ticket_text(subject: object, body: object) -> str:
 
 @dataclass(frozen=True)
 class Ticket:
-    subject: str
-    body: str
+    # Raw customer text is deliberately hidden from dataclass reprs so an
+    # accidental ``logger.info(ticket)`` cannot become a PII leak.
+    subject: str = field(repr=False)
+    body: str = field(repr=False)
 
     @property
     def text(self) -> str:
@@ -59,6 +61,20 @@ class LabelDistribution:
     def confidence(self) -> float:
         return self.probabilities.get(self.label, 0.0)
 
+    @property
+    def margin(self) -> float:
+        """Difference between the two most likely labels.
+
+        Confidence and margin are kept separate because a calibrated top score
+        can still be ambiguous when the runner-up is almost as likely.
+        """
+        ranked = sorted(self.probabilities.values(), reverse=True)
+        if not ranked:
+            return 0.0
+        if len(ranked) == 1:
+            return ranked[0]
+        return ranked[0] - ranked[1]
+
 
 @dataclass(frozen=True)
 class TicketLabels:
@@ -77,6 +93,13 @@ class TicketLabels:
             name: {
                 "label": self.head(name).label,
                 "confidence": round(self.head(name).confidence, 3),
+                "margin": round(self.head(name).margin, 3),
+                "probabilities": {
+                    label: round(probability, 3)
+                    for label, probability in sorted(
+                        self.head(name).probabilities.items()
+                    )
+                },
             }
             for name in LABEL_HEADS
         }
@@ -152,6 +175,9 @@ class TriageResult:
     precedents: list[Precedent]
     pii_counts: dict[str, int]
     injection_signals: list[str]
+    evidence_sufficient: bool = False
+    top_similarity: float = 0.0
+    security_events: list[str] = field(default_factory=list)
     route: str = "none"  # "fast", "deep", or "none" when stopped before routing
     route_reasons: list[str] = field(default_factory=list)
     status: str = HUMAN_REVIEW
@@ -160,6 +186,9 @@ class TriageResult:
     draft_reply: str | None = None
     removed_claims: list[str] = field(default_factory=list)
     verification_issues: list[str] = field(default_factory=list)
+    grounding_review: dict[str, Any] | None = None
+    draft_citations: list[str] = field(default_factory=list)
+    runtime_backends: dict[str, str] = field(default_factory=dict)
     llm_calls: list[LLMCallRecord] = field(default_factory=list)
     stage_latency_ms: dict[str, float] = field(default_factory=dict)
     latency_ms: float = 0.0
@@ -173,7 +202,11 @@ class TriageResult:
         return sum(call.estimated_cost_usd for call in self.llm_calls)
 
     def to_dict(self) -> dict[str, Any]:
-        """Plain dictionary for JSON logging or the UI."""
+        """Plain dictionary for the trusted UI.
+
+        Use :func:`sentineldesk.audit.build_audit_event` for operational logs;
+        this richer view intentionally includes draft and matched security text.
+        """
         return {
             "status": self.status,
             "reasons": self.reasons,
@@ -203,6 +236,12 @@ class TriageResult:
             "verification_issues": self.verification_issues,
             "pii_counts": self.pii_counts,
             "injection_signals": self.injection_signals,
+            "security_events": self.security_events,
+            "evidence_sufficient": self.evidence_sufficient,
+            "top_similarity": round(self.top_similarity, 3),
+            "grounding_review": self.grounding_review,
+            "draft_citations": self.draft_citations,
+            "runtime_backends": self.runtime_backends,
             "latency_ms": round(self.latency_ms, 1),
             "stage_latency_ms": {
                 stage: round(milliseconds, 1)

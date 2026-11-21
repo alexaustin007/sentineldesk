@@ -1,7 +1,7 @@
 import pytest
 
 from sentineldesk.consensus import blend_predictions, find_disagreements
-from sentineldesk.precedent_vote import vote_on_labels
+from sentineldesk.precedent_vote import credible_precedents, vote_on_labels
 from sentineldesk.schemas import LabelDistribution, Precedent, TicketLabels
 
 
@@ -40,7 +40,14 @@ def test_vote_without_usable_evidence_returns_none() -> None:
     assert vote_on_labels([make_precedent("A", -0.2)]) is None
 
 
-def test_blend_and_disagreement() -> None:
+def test_weak_neighbors_cannot_vote_or_support_a_draft() -> None:
+    strong = make_precedent("STRONG", 0.91)
+    weak = make_precedent("WEAK", 0.12)
+
+    assert credible_precedents([strong, weak], min_similarity=0.5) == [strong]
+
+
+def test_rag_vote_does_not_change_classifier_probabilities() -> None:
     classifier = TicketLabels(
         source="classifier",
         type=LabelDistribution({"Incident": 0.8, "Request": 0.2}),
@@ -54,16 +61,27 @@ def test_blend_and_disagreement() -> None:
         priority=LabelDistribution({"low": 1.0}),
     )
 
-    combined = blend_predictions(classifier, precedents, classifier_weight=0.6)
+    selected = blend_predictions(classifier, precedents, classifier_weight=0.6)
     disagreements = find_disagreements(
         classifier, precedents, heads=("type", "queue", "priority")
     )
 
-    # Request: 0.6 * 0.2 + 0.4 * 1.0 = 0.52 beats Incident: 0.6 * 0.8 = 0.48.
-    assert combined.type.label == "Request"
-    assert combined.type.confidence == pytest.approx(0.52)
+    assert selected is classifier
+    assert selected.type.label == "Incident"
+    assert selected.type.confidence == pytest.approx(0.8)
     assert len(disagreements) == 1
     assert disagreements[0].startswith("type:")
+
+
+def test_classifier_stands_alone_without_rag_evidence() -> None:
+    classifier = TicketLabels(
+        source="classifier",
+        type=LabelDistribution({"Incident": 0.6, "Request": 0.4}),
+        queue=LabelDistribution({"IT Support": 1.0}),
+        priority=LabelDistribution({"medium": 1.0}),
+    )
+
+    assert blend_predictions(classifier, None) is classifier
 
 
 def test_reviewer_choice_overrides_label_but_keeps_probabilities() -> None:

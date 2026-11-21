@@ -71,13 +71,22 @@ class TriageConfig:
     retrieval_top_k: int = 10
     precedents_shown: int = 5
 
-    # Consensus: weight of the external classifier when blended with the RAG vote.
-    classifier_weight: float = 0.6
+    # The classifier probabilities and historical vote shares are deliberately
+    # kept separate. A RAG vote share is useful evidence, but it is not a
+    # calibrated model probability and must not be averaged into one.
     heads_that_must_agree: tuple[str, ...] = LABEL_HEADS
 
-    # Fast-path requirements.
-    min_head_confidence: float = 0.55
+    # Classifier uncertainty gates. These apply to the raw calibrated classifier
+    # distributions before RAG evidence or an LLM can influence the decision.
+    # Tune both values on validation data and record the chosen operating point.
+    min_classifier_confidence: float = 0.55
+    min_classifier_margin: float = 0.10
     # Below this best-match similarity there is no grounded answer. With the
     # multilingual index, 95% of historical validation tickets score above 0.77,
     # short realistic tickets 0.63 to 0.85, and off-topic text 0.22 to 0.32.
     min_top_similarity: float = 0.5
+
+    @property
+    def min_head_confidence(self) -> float:
+        """Compatibility alias for callers migrating to the explicit name."""
+        return self.min_classifier_confidence

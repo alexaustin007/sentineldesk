@@ -11,10 +11,52 @@ from sentineldesk.schemas import (
     AUTO_DRAFT_READY,
     ESCALATE_IMMEDIATELY,
     HUMAN_REVIEW,
+    LabelDistribution,
     Precedent,
     ScreeningResult,
     TicketLabels,
 )
+
+
+def probability_margin(distribution: LabelDistribution) -> float:
+    """Return the gap between the two most likely classifier labels."""
+    ranked_probabilities = sorted(distribution.probabilities.values(), reverse=True)
+    if not ranked_probabilities:
+        return 0.0
+    if len(ranked_probabilities) == 1:
+        return ranked_probabilities[0]
+    return ranked_probabilities[0] - ranked_probabilities[1]
+
+
+def find_model_uncertainty(
+    classifier_labels: TicketLabels, config: TriageConfig
+) -> list[str]:
+    """Explain which raw classifier heads require deterministic human review.
+
+    This gate runs before any LLM call. It examines the calibrated classifier
+    distributions directly; RAG vote shares never raise these scores.
+    """
+    low_confidence_heads = []
+    low_margin_heads = []
+    for head in LABEL_HEADS:
+        distribution = classifier_labels.head(head)
+        confidence = max(distribution.probabilities.values(), default=0.0)
+        margin = probability_margin(distribution)
+        if confidence < config.min_classifier_confidence:
+            low_confidence_heads.append(
+                f"{head} ({confidence:.2f} < {config.min_classifier_confidence:.2f})"
+            )
+        if margin < config.min_classifier_margin:
+            low_margin_heads.append(
+                f"{head} ({margin:.2f} < {config.min_classifier_margin:.2f})"
+            )
+
+    reasons = []
+    if low_confidence_heads:
+        reasons.append("Low classifier confidence: " + ", ".join(low_confidence_heads))
+    if low_margin_heads:
+        reasons.append("Ambiguous classifier margin: " + ", ".join(low_margin_heads))
+    return reasons
 
 
 def is_high_priority_incident(labels: TicketLabels, config: TriageConfig) -> bool:
@@ -112,7 +154,7 @@ class RouteDecision:
 
 
 def choose_route(
-    combined_labels: TicketLabels,
+    classifier_labels: TicketLabels,
     disagreements: Sequence[str],
     top_similarity: float,
     risk_signals: Sequence[str],
@@ -120,21 +162,19 @@ def choose_route(
     has_attachments: bool,
     config: TriageConfig,
 ) -> RouteDecision:
-    """Fast path only when the agents agree, are confident, have evidence, and see no risk."""
+    """Choose model depth after deterministic review gates have passed.
+
+    Confidence and margin are deliberately absent here. Call
+    :func:`find_model_uncertainty` first and send any resulting reasons directly
+    to human review instead of asking an LLM to overrule model uncertainty.
+    """
     reasons = [f"Agents disagree on {disagreement}" for disagreement in disagreements]
-    low_confidence_heads = [
-        head
-        for head in LABEL_HEADS
-        if combined_labels.head(head).confidence < config.min_head_confidence
-    ]
-    if low_confidence_heads:
-        reasons.append("Low blended confidence on " + ", ".join(low_confidence_heads))
     if top_similarity < config.min_top_similarity:
         reasons.append(
             f"Weak evidence: best precedent similarity {top_similarity:.2f} "
             f"is below {config.min_top_similarity:.2f}"
         )
-    if priority_severity(combined_labels.priority.label) >= priority_severity("high"):
+    if priority_severity(classifier_labels.priority.label) >= priority_severity("high"):
         reasons.append("High predicted priority")
     reasons.extend(f"Risk signal: {signal}" for signal in risk_signals)
     reasons.extend(unsupported_requests)

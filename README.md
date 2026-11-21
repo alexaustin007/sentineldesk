@@ -3,7 +3,7 @@ SentinelDesk Hackathon project for multilingual incident triage and evidence-bac
 
 ## Hackathon dataset
 
-The team uses the full three-file snapshot of Tobi-Bueck's Customer Support Tickets dataset (CC BY-NC 4.0). Download all three CSVs from the pinned revision and prepare them with Python 3.10 or later. [Dataset card](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets)
+The team uses the full three-file snapshot of Tobi-Bueck's Customer Support Tickets dataset (CC BY-NC 4.0). Download all three CSVs from the pinned revision and prepare them with Python 3.10 or later. The complete app and Streamlit dashboard require Python 3.11 or later. [Dataset card](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets)
 
 ```bash
 mkdir -p data
@@ -38,14 +38,15 @@ Use a validation subset of the historical split when tuning models or thresholds
 
 ## Triage workflow (RAG and agents)
 
-The `sentineldesk` package holds the retrieval engine and the agent workflow. Each ticket goes through these steps:
+The `sentineldesk` package holds the retrieval engine and the agent workflow. Each ticket goes through these five judge-facing stages:
 
-1. **Guardrails.** The workflow detects the language (only English and German get automated replies), masks personal data, and screens for prompt injection.
-2. **Agent 1: classifier.** The team's trained model plugs in through `TicketClassifier`.
-3. **Agent 2: precedent vote.** FAISS retrieves similar historical tickets, and they vote on type, queue, and priority, weighted by similarity.
-4. **Mandatory escalation.** Any high-priority Incident goes straight to the on-call engineer, with no LLM call.
-5. **Routing.** When both agents agree with enough confidence, the evidence is strong, and there are no risk cues, Gemini Flash-Lite drafts the reply. Otherwise Gemini Flash first challenges the triage as an adversarial reviewer.
-6. **Verification.** Every draft must cite retrieved tickets. Unsupported promises such as amounts, deadlines, refunds, or guarantees are removed, and any removal or security finding sends the draft to human review.
+1. **Security guardrails.** Validate size and required text, normalize Unicode, detect the language (only English and German get automated replies), redact personal data, isolate untrusted text as JSON, and stop prompt injection before inference.
+2. **Parallel classification + RAG.** The calibrated three-head classifier and FAISS retrieval run independently. RAG vote share is displayed as historical agreement and never averaged into classifier confidence.
+3. **Deterministic escalation.** High-priority Incidents page on-call. Low classifier confidence/margin, weak evidence, or unsupported commitments go directly to human review without an LLM call.
+4. **Grounded generation + verification.** Gemini returns a strict structured draft. Python verifies every substantive sentence's citations and safety; a separate deep-model grounding reviewer then checks the draft against the cited resolutions. Any invalid or uncertain verdict fails closed.
+5. **Explainable dashboard.** Streamlit shows model probabilities, RAG votes, exact evidence, policy reasons, verifier output, latency, tokens, cost, and an unmistakable mock/real mode banner.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the diagram, file-reading order, and a rule-by-rule learning guide.
 
 ### Run it
 
@@ -74,6 +75,14 @@ Run the demo on sample tickets:
 ```bash
 python -m sentineldesk.demo
 ```
+
+Run the judge-facing dashboard:
+
+```bash
+streamlit run app.py
+```
+
+The sidebar's **Judge mode** refuses to start unless the prepared full dataset, trained classifier, matching multilingual FAISS index, and Gemini credentials are all available. Leave it off for the clearly marked 16-ticket/mock development experience.
 
 Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. It uses the trained classifier from `python classification/classify.py` when its models exist, and a keyword mock otherwise. Without Gemini credentials, it uses a mock LLM.
 
@@ -104,6 +113,7 @@ python -m sentineldesk.check_llm
 | `SENTINEL_DEEP_INPUT_PRICE`, `SENTINEL_DEEP_OUTPUT_PRICE` | `0.75`, `3.75` | USD per million tokens, used for cost estimates |
 | `SENTINEL_EMBEDDER` | `sentence-transformers` | Set to `tfidf` for offline retrieval |
 | `SENTINEL_EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Multilingual retrieval model |
+| `SENTINEL_AUDIT_LOG` | not set | Optional path for durable, redacted JSON-lines security audit events |
 
 Keep API keys in your shell or an untracked `.env` file. Tune the thresholds in `TriageConfig` on a validation slice of the historical split, never on the holdout.
 
@@ -111,7 +121,7 @@ Keep API keys in your shell or an untracked `.env` file. Tune the thresholds in 
 
 - **Data:** `load_historical_tickets()` in `sentineldesk/data_interface.py` reads `data/prepared/`. It joins the answers in `knowledge_base.csv` with the labels in `train.csv` by ticket ID, and refuses to continue if any ID from `holdout_inputs.csv` would be indexed.
 - **Classifier:** Implement `predict(subject, body) -> TicketLabels`, or wrap three fitted scikit-learn models with `SklearnClassifierAdapter({"type": ..., "queue": ..., "priority": ...})`. The adapter sends `{"subject", "body"}` records, matching `make_ticket_features()`.
-- **UI:** Call `create_orchestrator(classifier=...)` from `sentineldesk.app_factory` once and cache it, for example with `st.cache_resource`. Then call `triage(subject, body)` for each ticket. The returned `TriageResult` has the status, reasons, labels with confidence, precedents, draft, latency, tokens, and cost. `result.to_dict()` gives plain JSON.
+- **UI:** Call `create_orchestrator(classifier=..., allow_mock=False)` from `sentineldesk.app_factory` once and cache it with `st.cache_resource` for judge mode. Then call `triage(subject, body)` for each ticket. `TriageResult` keeps calibrated classifier confidence, RAG vote share, evidence sufficiency, verifier verdict, stage timings, tokens, and cost as separate inspectable fields. `result.to_dict()` is the trusted UI/debug payload; use `build_audit_event(result)` from `sentineldesk.audit` for redacted operational logs.
 
 ## Contributing
 

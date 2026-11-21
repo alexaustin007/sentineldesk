@@ -49,3 +49,17 @@ def test_adapter_sends_ticket_records_to_the_pipeline() -> None:
     assert labels.type.label == "Incident"
     assert labels.queue.label == "IT Support"
     assert sum(labels.priority.probabilities.values()) == pytest.approx(1.0)
+
+
+class InvalidProbabilityModel:
+    classes_ = ("a", "b")
+
+    def predict_proba(self, _inputs: object) -> list[list[float]]:
+        return [[0.8, 0.8]]
+
+
+def test_adapter_rejects_non_normalized_probabilities() -> None:
+    models = {head: InvalidProbabilityModel() for head in TRAINING_LABELS}
+
+    with pytest.raises(ValueError, match="probabilities sum"):
+        SklearnClassifierAdapter(models).predict("subject", "body")

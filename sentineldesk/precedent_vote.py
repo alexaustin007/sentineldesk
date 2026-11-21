@@ -7,6 +7,15 @@ from sentineldesk.config import LABEL_HEADS
 from sentineldesk.schemas import LabelDistribution, Precedent, TicketLabels
 
 
+def credible_precedents(
+    precedents: Sequence[Precedent], min_similarity: float
+) -> list[Precedent]:
+    """Keep only neighbors strong enough to vote, support, or be cited."""
+    return [
+        precedent for precedent in precedents if precedent.similarity >= min_similarity
+    ]
+
+
 def vote_on_labels(precedents: Sequence[Precedent]) -> TicketLabels | None:
     """Similarity-weighted vote of the retrieved precedents for each head.
 

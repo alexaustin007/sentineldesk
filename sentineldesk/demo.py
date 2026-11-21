@@ -12,10 +12,8 @@ import json
 from sentineldesk.app_factory import create_orchestrator
 from sentineldesk.classifier_interface import MockClassifier
 from sentineldesk.config import TriageConfig
-from sentineldesk.data_interface import has_prepared_data, load_mock_historical_tickets
-from sentineldesk.llm import create_llm_provider
+from sentineldesk.data_interface import has_prepared_data
 from sentineldesk.orchestrator import TriageOrchestrator
-from sentineldesk.retrieval import PrecedentIndex, TfidfEmbedder
 
 SAMPLE_TICKETS: list[tuple[str, str]] = [
     (
@@ -57,30 +55,34 @@ SUMMARY_FIELDS = (
     "status",
     "reasons",
     "route",
+    "classifier_labels",
+    "rag_labels",
     "final_labels",
+    "evidence_sufficient",
+    "top_similarity",
     "draft_reply",
+    "grounding_review",
+    "stage_latency_ms",
     "latency_ms",
     "estimated_cost_usd",
 )
 
 
 def build_demo_orchestrator() -> TriageOrchestrator:
-    if has_prepared_data():
-        return create_orchestrator()
-    # Offline fallback. TF-IDF similarities run lower than sentence embeddings.
-    return TriageOrchestrator(
-        classifier=MockClassifier(),
-        precedent_index=PrecedentIndex.build(
-            load_mock_historical_tickets(), TfidfEmbedder()
-        ),
-        llm_provider=create_llm_provider(),
-        config=TriageConfig(min_top_similarity=0.3),
-    )
+    # Offline TF-IDF similarities run lower than multilingual embeddings.
+    config = TriageConfig(min_top_similarity=0.5 if has_prepared_data() else 0.3)
+    return create_orchestrator(config=config)
 
 
 def main() -> None:
     orchestrator = build_demo_orchestrator()
     index = orchestrator.precedent_index
+    is_mock = (
+        isinstance(orchestrator.classifier, MockClassifier)
+        or len(index.tickets) <= 16
+        or orchestrator.llm_provider.name == "mock"
+    )
+    print(f"Mode: {'MOCK / DEVELOPMENT' if is_mock else 'REAL / JUDGE READY'}")
     print(f"Knowledge base: {len(index.tickets)} tickets ({index.embedder.name})")
     print(f"LLM provider: {orchestrator.llm_provider.name}")
     for subject, body in SAMPLE_TICKETS:

@@ -72,7 +72,7 @@ class LLMRequest:
     tier: ModelTier
     system_prompt: str
     user_prompt: str
-    # Ask for JSON that matches this schema (used by the adversarial review).
+    # Ask for JSON that matches this schema.
     response_schema: type[BaseModel] | None = None
     attachments: tuple[Attachment, ...] = ()
     # Structured inputs behind the prompt. The mock provider builds answers from them.
@@ -263,6 +263,8 @@ def default_mock_responder(request: LLMRequest) -> str:
         return _mock_review(request.context)
     if request.task == "draft_reply":
         return _mock_reply(request.context)
+    if request.task == "grounding_review":
+        return _mock_grounding_review(request.context)
     return ""
 
 
@@ -286,22 +288,60 @@ def _mock_review(context: dict[str, Any]) -> str:
 
 
 def _mock_reply(context: dict[str, Any]) -> str:
-    """Template reply that reuses the top precedent's resolution and cites it."""
+    """Structured reply that reuses the top precedent's resolution and cites it."""
     citation = context.get("top_ticket_id", "")
     sentences = re.split(r"(?<=[.!?])\s+", str(context.get("top_answer", "")).strip())
     # Like an instructed model, skip sentences with template slots such as <name>.
     usable = [
         sentence for sentence in sentences if not re.search(r"<[a-z_]+>", sentence)
     ]
-    resolution = " ".join(usable[:2])
+    resolution = " ".join(
+        f"{sentence} [{citation}]" for sentence in usable[:2] if citation
+    )
     if context.get("language") == "de":
-        return (
-            f"Hallo,\n\nvielen Dank für Ihre Nachricht. {resolution} [{citation}]\n\n"
-            "Falls das Problem weiterhin besteht, antworten Sie bitte auf diese Nachricht.\n\n"
+        draft = (
+            f"Hallo,\n\nvielen Dank für Ihre Nachricht. {resolution}\n\n"
+            "Falls das Problem weiterhin besteht, antworten Sie bitte auf diese "
+            f"Nachricht. [{citation}]\n\n"
             "Mit freundlichen Grüßen\nIhr SentinelDesk-Support"
         )
-    return (
-        f"Hello,\n\nThank you for contacting us. {resolution} [{citation}]\n\n"
-        "If the issue persists, please reply to this message and we will follow up.\n\n"
-        "Best regards,\nSentinelDesk Support"
+    else:
+        draft = (
+            f"Hello,\n\nThank you for contacting us. {resolution}\n\n"
+            "If the issue persists, please reply to this message and we will follow "
+            f"up. [{citation}]\n\nBest regards,\nSentinelDesk Support"
+        )
+    return json.dumps(
+        {
+            "draft": draft,
+            "cited_ticket_ids": [citation] if citation else [],
+            "evidence_sufficient": bool(citation and resolution),
+        }
+    )
+
+
+def _mock_grounding_review(context: dict[str, Any]) -> str:
+    """Return a deterministic citation verdict for offline integration tests."""
+    draft = str(context.get("draft", ""))
+    retrieved_ids = {str(value) for value in context.get("precedent_ids", [])}
+    cited_ids = set(re.findall(r"\[([A-Z][A-Z0-9]*-[A-Za-z0-9-]+)\]", draft))
+    unknown_ids = sorted(cited_ids - retrieved_ids)
+    valid_citations = bool(cited_ids) and not unknown_ids
+    unsupported_claims = [
+        f"Citation references unretrieved ticket {ticket_id}"
+        for ticket_id in unknown_ids
+    ]
+    grounded = valid_citations and not unsupported_claims
+    return json.dumps(
+        {
+            "grounded": grounded,
+            "valid_citations": valid_citations,
+            "unsupported_claims": unsupported_claims,
+            "recommend_escalation": not grounded,
+            "rationale": (
+                "Mock verifier found only retrieved citation IDs."
+                if grounded
+                else "Mock verifier found missing or unretrieved citation IDs."
+            ),
+        }
     )
