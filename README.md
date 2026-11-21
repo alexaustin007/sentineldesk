@@ -69,6 +69,12 @@ Check how well the precedent vote predicts labels on a validation slice of the h
 python -m sentineldesk.rag_validation
 ```
 
+Score the workflow on the holdout split and refresh the console's Metrics page (`ui/public/metrics.json`). It labels every holdout ticket without LLM calls, then runs 30 sampled tickets through live Gemini for latency and cost. Holdout labels are read only after all predictions are made.
+
+```bash
+python -m sentineldesk.evaluate_holdout
+```
+
 Run the demo on sample tickets:
 
 ```bash

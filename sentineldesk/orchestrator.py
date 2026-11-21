@@ -26,12 +26,14 @@ from sentineldesk.config import TriageConfig
 from sentineldesk.consensus import blend_predictions, find_disagreements
 from sentineldesk.escalation import (
     choose_route,
+    classifier_incident_score,
     decide_status,
     find_mandatory_escalation,
     find_missing_detail,
     find_risk_signals,
     find_screening_issues,
     find_unsupported_requests,
+    high_priority_incident_share,
     is_high_priority_incident,
 )
 from sentineldesk.guardrails import screen_ticket
@@ -126,6 +128,10 @@ class TriageOrchestrator:
             ),
             pii_counts=screening.pii_counts,
             injection_signals=screening.injection_signals,
+            incident_risk=max(
+                classifier_incident_score(classifier_labels, self.config),
+                high_priority_incident_share(voting_precedents, self.config),
+            ),
         )
 
         # A near-empty ticket gives neither agent anything to judge.

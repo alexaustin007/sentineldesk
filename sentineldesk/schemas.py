@@ -163,6 +163,8 @@ class TriageResult:
     llm_calls: list[LLMCallRecord] = field(default_factory=list)
     stage_latency_ms: dict[str, float] = field(default_factory=dict)
     latency_ms: float = 0.0
+    # Strongest "high-priority Incident" signal from either agent (0 to 1).
+    incident_risk: float = 0.0
 
     @property
     def total_tokens(self) -> int:
