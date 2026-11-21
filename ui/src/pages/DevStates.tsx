@@ -1,10 +1,13 @@
 import { useEffect, type ReactNode } from "react";
 import contractExample from "../../../contracts/triage_response.example.json";
+import metricsExample from "../../../contracts/metrics.example.json";
 import { ConsoleView } from "../components/ConsoleView";
 import { EntryView } from "../components/EntryView";
 import { deBilling, humanReviewDeep, injection, knowledgeGap, lowConfidence, vpnOutage } from "../mocks";
 import type { RunState } from "../lib/run";
 import { parseTriageResponse, type TriageError } from "../lib/validate";
+import { parseMetrics } from "../lib/validateMetrics";
+import { MetricsInvalid, MetricsLoading, MetricsView } from "./MetricsPage";
 import type { TriageResponse } from "../types/triage";
 
 // Type-checks the frozen contract example against ui/src/types/triage.ts at build time.
@@ -141,6 +144,58 @@ const CASES: Case[] = [
   },
 ];
 
+// ---- Metrics tab states (spec: docs/ui-specs/metrics.md) ----
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- building deliberately broken/partial files
+type Obj = Record<string, any>;
+const sample = () => structuredClone(metricsExample) as unknown as Obj;
+
+function minimalMetrics(): Obj {
+  // Only the required fields: every optional column, row and fact must disappear without empty cells.
+  const m = sample();
+  delete m.sample;
+  for (const h of Object.values(m.heads) as Obj[]) {
+    delete h.accuracy;
+    delete h.calibration_error;
+    delete h.macro_f1_by_language;
+  }
+  for (const k of ["calibration_error", "drafts", "high_priority_incident", "escalation_tradeoff", "pipeline", "split", "model", "dataset", "generated_at"]) delete m[k];
+  return m;
+}
+
+function invalidMessage(): string {
+  const m = sample();
+  m.high_priority_incident_recall = "n/a";
+  m.heads.queue.confusion = [[1, 2]];
+  try {
+    parseMetrics(m);
+  } catch (e) {
+    return (e as Error).message;
+  }
+  return "";
+}
+
+const METRICS_CASES: { id: string; title: string; node: ReactNode }[] = [
+  { id: "metrics-sample", title: "Metrics · sample data (the bundled example)", node: <MetricsView metrics={parseMetrics(sample())} source="sample" /> },
+  {
+    id: "metrics-real",
+    title: "Metrics · real data (no sample notice)",
+    node: <MetricsView metrics={parseMetrics({ ...sample(), sample: false })} source="live" />,
+  },
+  {
+    id: "metrics-drafts",
+    title: "Metrics · drafts present (extra Draft quality fact)",
+    node: (
+      <MetricsView
+        metrics={parseMetrics({ ...sample(), sample: false, drafts: { citations_valid_rate: 0.974, language_match_rate: 0.991, removed_claims_rate: 0.042 } })}
+        source="live"
+      />
+    ),
+  },
+  { id: "metrics-minimal", title: "Metrics · optional fields missing (columns, rows and facts hidden)", node: <MetricsView metrics={parseMetrics(minimalMetrics())} source="live" /> },
+  { id: "metrics-invalid", title: "Metrics · invalid file (inline message + Retry)", node: <MetricsInvalid message={invalidMessage()} onRetry={noop} /> },
+  { id: "metrics-loading", title: "Metrics · loading (section titles with placeholders)", node: <MetricsLoading /> },
+];
+
 export function DevStates() {
   useEffect(() => {
     if (window.location.hash) document.getElementById(window.location.hash.slice(1))?.scrollIntoView();
@@ -148,9 +203,9 @@ export function DevStates() {
   return (
     <div className="flex flex-col gap-10">
       <nav className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-        {CASES.map((c) => (
+        {[...CASES, ...METRICS_CASES].map((c) => (
           <a key={c.id} href={`#${c.id}`} className="text-accent hover:underline">
-            {c.title.split(" · ")[0]}
+            {c.id.startsWith("metrics-") ? c.id.replace("metrics-", "Metrics ") : c.title.split(" · ")[0]}
           </a>
         ))}
       </nav>
@@ -186,6 +241,11 @@ export function DevStates() {
             onNew={noop}
           />
           )}
+        </Frame>
+      ))}
+      {METRICS_CASES.map((c) => (
+        <Frame key={c.id} id={c.id} title={c.title}>
+          <div className="rounded-lg border border-line bg-bg px-6 pt-6">{c.node}</div>
         </Frame>
       ))}
     </div>

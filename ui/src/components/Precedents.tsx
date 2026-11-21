@@ -77,7 +77,7 @@ export const Precedents = forwardRef<PrecedentsHandle, { res: TriageResponse; ho
                   onClick={() => setOpen(isOpen ? null : p.ticket_id)}
                   aria-expanded={isOpen}
                   aria-controls={`prec-body-${p.ticket_id}`}
-                  className="grid w-full grid-cols-[96px_minmax(0,1fr)_14px] items-start gap-x-4 px-6 py-3.5 text-left hover:bg-surface-2"
+                  className="grid w-full grid-cols-[112px_minmax(0,1fr)_14px] items-start gap-x-4 px-6 py-3.5 text-left hover:bg-surface-2"
                 >
                   <span className="pt-px">
                     <span className={`mono block text-[14px] font-medium ${strong}`}>{p.ticket_id}</span>
@@ -143,7 +143,7 @@ function Evidence({ p, weak }: { p: Precedent; weak: boolean }) {
 
   return (
     <div id={`prec-body-${p.ticket_id}`} className="max-h-[460px] overflow-y-auto overscroll-contain px-6 pb-5">
-      <div className="ml-[112px] flex flex-col gap-5 border-l-2 border-line-strong pl-5">
+      <div className="ml-[128px] flex flex-col gap-5 border-l-2 border-line-strong pl-5">
         {p.body && (
           <div>
             <h4 className="label mb-1.5">Original ticket</h4>

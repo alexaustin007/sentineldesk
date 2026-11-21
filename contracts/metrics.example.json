@@ -26,7 +26,12 @@
         [117, 974, 49, 20],
         [138, 122, 496, 44],
         [63, 39, 26, 312]
-      ]
+      ],
+      "calibration_error": 0.028,
+      "macro_f1_by_language": {
+        "en": 0.785,
+        "de": 0.76
+      }
     },
     "queue": {
       "macro_f1": 0.631,
@@ -55,7 +60,12 @@
         [12, 10, 17, 6, 3, 2, 4, 101, 2, 3],
         [13, 6, 5, 4, 2, 1, 1, 1, 86, 1],
         [16, 8, 8, 3, 4, 2, 3, 1, 2, 33]
-      ]
+      ],
+      "calibration_error": 0.041,
+      "macro_f1_by_language": {
+        "en": 0.642,
+        "de": 0.618
+      }
     },
     "priority": {
       "macro_f1": 0.707,
@@ -70,9 +80,15 @@
         [1232, 213, 115],
         [255, 1164, 221],
         [131, 165, 504]
-      ]
+      ],
+      "calibration_error": 0.033,
+      "macro_f1_by_language": {
+        "en": 0.721,
+        "de": 0.692
+      }
     }
   },
+  "calibration_error": 0.034,
   "high_priority_incident_recall": 0.913,
   "high_priority_incident": {
     "caught": 409,
@@ -99,6 +115,7 @@
       "tickets_escalated": 1520
     }
   ],
+  "drafts": null,
   "pipeline": {
     "status_mix": {
       "auto_draft": 0.52,

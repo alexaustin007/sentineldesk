@@ -55,7 +55,7 @@ Stack: Vite 6, React 18, TypeScript 5.8 (strict), Tailwind v4 (`@tailwindcss/vit
 - [x] Panes stack below 1024 px with no horizontal scroll.
 - [x] One primary button, 4 chips, no language picker, no "AI" styling. The banner is the only saturated fill (B1).
 
-Screenshots (1440 px) of the current build are in `docs/ui-screenshots/`.
+Screenshots were taken locally and are not committed.
 
 ## Contract gaps (for backend owners; contract not edited)
 
@@ -110,7 +110,7 @@ The owner said the UI looked sparse, washed-out and generic. The changes below a
 | 14 | Dark Triage fill is `#3d61cb` with white text (5.6:1), down from the bright `#7d9cf5`. |
 | also | Long queue/subject labels get a `title` tooltip. Retry is a secondary button, so there is still exactly one primary (D1). |
 
-Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements (bars identical, subjects visible, no horizontal scroll). No console errors in the browser pane. Screenshots were kept locally with the `v2-` prefix.
+Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements (bars identical, subjects visible, no horizontal scroll). No console errors in the browser pane. Screenshots are in the shared notes folder with the `v2-` prefix.
 
 ## Entry-first flow (team request)
 
@@ -119,7 +119,7 @@ Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements
 - **New ticket** cancels any in-flight request, clears the fields and returns to the entry view with the body focused.
 - **Error and timeout** still render in the results pane with Retry (unchanged).
 - On `/dev/states`, `#entry` and `#validation` render the entry view. The other cases still show the two-pane layout.
-- Verified at 1440 px light and dark: entry, loading, result B, New ticket, and `?mock=error` with Retry. Typecheck and build pass. Screenshots were kept locally with the `v3-` prefix.
+- Verified at 1440 px light and dark: entry, loading, result B, New ticket, and `?mock=error` with Retry. Typecheck and build pass. Screenshots are in the shared notes folder with the `v3-` prefix.
 
 ## Example tickets as quiet links (team request)
 
@@ -175,7 +175,7 @@ The UI now follows the revised `contracts/triage_response.example.json` and UI_W
   - New `humanReviewDeep.ts` (wireframe E) → `human_review` with a draft, route `deep`, disagreement on queue, one removed claim, one reason without a code, and one precedent without language/subject. It is only on `/dev/states#e`, because a fifth link would break the one line and D1's limit of 4.
 
   All precedent IDs are still below `TKT-49412`.
-- **Verified:** typecheck and build pass. Checked at 1440 px: `#e` in light (banner, Why rows, draft with removed claim, precedent without subject) and the VPN example on `/` in dark (red, no draft, 3 pipeline stages, cost hidden). Screenshots were kept locally with the `v4-` prefix. No review loop, per the team.
+- **Verified:** typecheck and build pass. Checked at 1440 px: `#e` in light (banner, Why rows, draft with removed claim, precedent without subject) and the VPN example on `/` in dark (red, no draft, 3 pipeline stages, cost hidden). Screenshots are in the shared notes folder with the `v4-` prefix. No review loop, per the team.
 - **Contract gap carried over from §3.2:** `critical_incident_risk` and margins may not reach the UI until PR #5's `TicketLabels` has slots for them. The UI hides those rows when they're null or absent.
 
 ## Expandable precedents with full evidence (team request)
@@ -254,3 +254,29 @@ Follows UI_WORKFLOW §4.1, tweaks row "Expandable precedents with full evidence"
 - **Unchanged:** citations (hover, click to open and flash the precedent), single-open precedents, every state on `/dev/states`, and the runtime check. Verified again: the pipeline summary expands to 5 steps, Why? opens 7 checks, and a `[TKT-22548]` click opens only that row.
 - **Verified:** typecheck, build and the 16 Node checks pass. Checked at 1440 px: injection in light (`v8-console-D-light.png`) and German billing in dark (`v8-console-B-dark.png`). No review loop.
 
+
+## Injection mock matches PR #5's early return
+
+- **Why:** in PR #5's `orchestrator.triage()`, `find_screening_issues` (prompt injection or unsupported language) returns before routing, retrieval-based drafting and any LLM call.
+- **`ui/src/mocks/injection.ts` now has:**
+  - `human_review` with the single reason "Possible prompt injection: …" (the unsupported-request check runs after the early return, so it was removed, and `unsupported_request` is unflagged)
+  - `route: { path: "none", reasons: [] }`, `draft: null` and zero usage
+  - only guardrails / classifier / retrieval timings, 0.17 s in total
+  - precedents kept, because retrieval runs before the gate
+- **The no-draft line now depends on the reason:**
+  - escalate: "No draft: paged on-call before drafting"
+  - prompt injection, unsupported language or `language_supported: false`: "No draft: blocked by guardrails before drafting"
+  - `LOW_SIMILARITY`: "No draft: no close precedent to ground a reply"
+  - other human review: "No draft: held for human review"
+- **Elsewhere:** the `/dev/states#d` title says "blocked before drafting". A new Node check pins the mock's shape (one `PROMPT_INJECTION` reason, route none, no draft, zero cost, three stages, under 0.5 s); 20 checks in total.
+- **Checked at 1440 px in light** (`v11-console-injection-light.png`): amber "Needs human review", the injection tag and reason, "No draft: blocked by guardrails before drafting", "Completed in 0.17 s · 3 steps", and the evidence still highlighted in the body.
+- **Shared fix:** `.rise` now uses `animation-fill-mode: backwards`, so finished entrance animations don't leave a transform behind. Behaviour on the console is unchanged; it mattered for the Metrics tooltips.
+
+## Prefixed ticket IDs (`TKT-V5-00042`)
+
+- **Cause:** `scripts/prepare_data.py` (team PR #7) can build IDs with a prefix. The citation regex was `/\[(TKT-\d{5})\]/g`, so those citations rendered as plain text.
+- **Fix:** the matching moved into a pure helper, `ui/src/lib/citations.ts` (`findCitations`), with the pattern `/\[(TKT(?:-[A-Z0-9]+)*-\d{5})\]/g`. It is anchored to our ID shape and covers everything Chase's looser verifier pattern can cite. `DraftReply.tsx` uses it. This was the only place assuming the old shape; precedent lookup and the citations-valid check key on the ID string.
+- **Layout:** the precedent ID column grew from 96 to 112 px (and the expanded body indent from 112 to 128 px), so `TKT-V5-12093` fits on one line.
+- **Mock:** the `deBilling` top precedent and its citation are now `TKT-V5-12093`.
+- **Tests:** two new checks in `validate.test.ts`: plain, prefixed and multi-prefix IDs are extracted while malformed ones (`[TKT-1]`, `[TKT-V5-1]`, bare or lower-case) are not; and every citation in the `deBilling` draft resolves to a precedent, including the `TKT-V5-` one. 24 checks in total.
+- **Verified:** typecheck, build and tests pass. At 1440 px, German billing shows both chips; clicking `[TKT-V5-12093]` opens and flashes only that row, and its ID fits in the column (`v14-tkt-v5-citation-light.png`).
