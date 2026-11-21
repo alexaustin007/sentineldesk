@@ -10,7 +10,7 @@ const score = (x: number) => x.toFixed(2);
 const int = (x: number | undefined | null) => (x == null ? "—" : Math.round(x).toLocaleString("en-US"));
 
 // Typography (spec v2): page title 24/32 · section question 17/24 · hero 44/48 · body and table 15/24 ·
-// labels and meta 13/18 · facts value 17/24. Inter only, sentence case, no monospace.
+// labels 13/18 · facts value 17/24. Inter only, sentence case, no monospace.
 const H2 = "text-[17px] leading-6 font-semibold text-ink";
 const SECTION = "border-t border-line pt-8";
 const LABEL = "text-[13px] leading-[18px] text-ink-3";
@@ -102,15 +102,6 @@ function Hint({ tip, wide = false, className = "", children }: { tip: ReactNode;
   );
 }
 
-/** "21 Nov, 14:00 UTC": generated_at is UTC, so say so rather than guess the viewer's zone. */
-function updated(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const day = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-  return `${day}, ${time} UTC`;
-}
-
 type Mix = NonNullable<NonNullable<Metrics["pipeline"]>["status_mix"]>;
 const share = (mix: Mix, k: keyof Mix) => mix[k] / (mix.auto_draft + mix.human_review + mix.escalate || 1);
 
@@ -165,7 +156,6 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
   if (cost) facts.push({ key: "cost", label: "Cost per ticket", value: cost, tip: <CostTip m={m} />, wide: true });
   if (draftHeadline && d) facts.push({ key: "draft", label: "Draft quality", value: draftHeadline, tip: <DraftTip d={d} /> });
 
-  const meta = [m.model && `Model ${m.model}`, m.dataset && `data ${m.dataset}`, m.generated_at && `updated ${updated(m.generated_at)}`].filter(Boolean);
 
   return (
     <Column>
@@ -258,7 +248,7 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
             </section>
           )}
 
-          {(facts.length > 0 || overlapNote || mix || meta.length > 0) && (
+          {(facts.length > 0 || overlapNote || mix) && (
             <section aria-labelledby="m-sound" className={SECTION}>
               <h2 id="m-sound" className={H2}>
                 {TITLES.sound}
@@ -292,7 +282,6 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
                   </Hint>
                 </p>
               )}
-              {meta.length > 0 && <p className={`${mix || facts.length > 0 ? "mt-5 " : "mt-3 "}${LABEL}`}>{meta.join(" · ")}</p>}
             </section>
           )}
         </div>
