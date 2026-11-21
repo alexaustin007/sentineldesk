@@ -8,11 +8,9 @@ import { HEAD_NAMES, type HeadMetrics, type HeadName, type Metrics } from "../ty
 const pct = (x: number, d = 0) => `${(x * 100).toFixed(d)}%`;
 const score = (x: number) => x.toFixed(2);
 const int = (x: number | undefined | null) => (x == null ? "—" : Math.round(x).toLocaleString("en-US"));
-/** F1 below this is amber, the only colour besides the three status colours. */
-const WEAK_F1 = 0.7;
 
 // Typography (spec v2): page title 24/32 · section question 17/24 · hero 44/48 · body and table 15/24 ·
-// labels and meta 13/18 · facts value 17/24. Inter only, sentence case, no monospace.
+// labels 13/18 · facts value 17/24. Inter only, sentence case, no monospace.
 const H2 = "text-[17px] leading-6 font-semibold text-ink";
 const SECTION = "border-t border-line pt-8";
 const LABEL = "text-[13px] leading-[18px] text-ink-3";
@@ -104,15 +102,6 @@ function Hint({ tip, wide = false, className = "", children }: { tip: ReactNode;
   );
 }
 
-/** "21 Nov, 14:00 UTC": generated_at is UTC, so say so rather than guess the viewer's zone. */
-function updated(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const day = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-  return `${day}, ${time} UTC`;
-}
-
 type Mix = NonNullable<NonNullable<Metrics["pipeline"]>["status_mix"]>;
 const share = (mix: Mix, k: keyof Mix) => mix[k] / (mix.auto_draft + mix.human_review + mix.escalate || 1);
 
@@ -124,20 +113,14 @@ interface Col {
   /** One-line definition shown on hover/focus of the header. */
   def: string;
   value: (h: HeadMetrics) => number | undefined;
-  /** F1-type columns turn amber below WEAK_F1. */
-  f1?: boolean;
-  bold?: boolean;
 }
 
 const COLS: Col[] = [
-  { key: "f1", header: "Macro-F1", def: "Unweighted mean of per-class F1, so small classes count as much as large ones.", value: (h) => h.macro_f1, f1: true, bold: true },
   { key: "acc", header: "Accuracy", def: "Share of holdout tickets labelled correctly.", value: (h) => h.accuracy },
-  { key: "en", header: "English", def: "Macro-F1 on the English holdout tickets only.", value: (h) => h.macro_f1_by_language?.en, f1: true },
-  { key: "de", header: "German", def: "Macro-F1 on the German holdout tickets only.", value: (h) => h.macro_f1_by_language?.de, f1: true },
   {
     key: "ece",
     header: "Calibration error",
-    def: "Expected calibration error (ECE): how far stated confidence is from how often the model is right. Lower is better.",
+    def: "Groups predictions by confidence and measures the average gap between confidence and accuracy. Closer to zero is better.",
     value: (h) => h.calibration_error,
   },
 ];
@@ -173,7 +156,6 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
   if (cost) facts.push({ key: "cost", label: "Cost per ticket", value: cost, tip: <CostTip m={m} />, wide: true });
   if (draftHeadline && d) facts.push({ key: "draft", label: "Draft quality", value: draftHeadline, tip: <DraftTip d={d} /> });
 
-  const meta = [m.model && `Model ${m.model}`, m.dataset && `data ${m.dataset}`, m.generated_at && `updated ${updated(m.generated_at)}`].filter(Boolean);
 
   return (
     <Column>
@@ -237,34 +219,36 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
             )}
           </section>
 
-          <section aria-labelledby="m-accuracy" className={SECTION}>
-            <h2 id="m-accuracy" className={H2}>
-              {TITLES.accuracy}
-            </h2>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-[15px] leading-6">
-                <thead>
-                  <tr>
-                    <th scope="col" className="pb-2 text-left">
-                      <span className="sr-only">Prediction</span>
-                    </th>
-                    {cols.map((col) => (
-                      <th key={col.key} scope="col" className="pb-2 pl-6 text-right text-[13px] leading-[18px] font-medium text-ink-2">
-                        <Hint tip={<TipBody>{col.def}</TipBody>}>{col.header}</Hint>
+          {cols.length > 0 && (
+            <section aria-labelledby="m-accuracy" className={SECTION}>
+              <h2 id="m-accuracy" className={H2}>
+                {TITLES.accuracy}
+              </h2>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full border-collapse text-[15px] leading-6">
+                  <thead>
+                    <tr>
+                      <th scope="col" className="pb-2 text-left">
+                        <span className="sr-only">Prediction</span>
                       </th>
+                      {cols.map((col) => (
+                        <th key={col.key} scope="col" className="pb-2 pl-6 text-right text-[13px] leading-[18px] font-medium text-ink-2">
+                          <Hint tip={<TipBody>{col.def}</TipBody>}>{col.header}</Hint>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {HEAD_NAMES.map((k) => (
+                      <HeadRow key={k} name={k} h={m.heads[k]} cols={cols} />
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {HEAD_NAMES.map((k) => (
-                    <HeadRow key={k} name={k} h={m.heads[k]} cols={cols} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
-          {(facts.length > 0 || overlapNote || mix || meta.length > 0) && (
+          {(facts.length > 0 || overlapNote || mix) && (
             <section aria-labelledby="m-sound" className={SECTION}>
               <h2 id="m-sound" className={H2}>
                 {TITLES.sound}
@@ -298,7 +282,6 @@ export function MetricsView({ metrics: m, source }: LoadedMetrics) {
                   </Hint>
                 </p>
               )}
-              {meta.length > 0 && <p className={`${mix || facts.length > 0 ? "mt-5 " : "mt-3 "}${LABEL}`}>{meta.join(" · ")}</p>}
             </section>
           )}
         </div>
@@ -316,15 +299,11 @@ function HeadRow({ name, h, cols }: { name: HeadName; h: HeadMetrics; cols: Col[
         <th scope="row" className="py-3 pr-6 text-left font-normal text-ink">
           <span className="underline decoration-dotted decoration-ink-3 underline-offset-[5px]">{HEAD_LABEL[name]}</span>
         </th>
-        {cols.map((col) => {
-          const v = col.value(h) as number;
-          const weak = col.f1 && v < WEAK_F1;
-          return (
-            <td key={col.key} className={`num py-3 pl-6 text-right ${col.bold ? "font-semibold" : ""} ${weak ? "text-amber" : "text-ink"}`}>
-              {score(v)}
-            </td>
-          );
-        })}
+        {cols.map((col) => (
+          <td key={col.key} className="num py-3 pl-6 text-right text-ink">
+            {score(col.value(h) as number)}
+          </td>
+        ))}
       </tr>
       {node}
     </>
@@ -381,18 +360,10 @@ function ClassTip({ name, h }: { name: HeadName; h: HeadMetrics }) {
   return (
     <TipBody title={`${HEAD_LABEL[name]}: per class`}>
       <TipTable
-        head={["Class", "F1", "Precision", "Recall", "Tickets"]}
+        head={["Class", "Precision", "Recall", "Tickets"]}
         rows={rows.map((c) => ({
           key: c.label,
-          cells: [
-            c.label,
-            <span key="f1" className={`font-semibold ${c.f1 < WEAK_F1 ? "text-amber" : ""}`}>
-              {score(c.f1)}
-            </span>,
-            score(c.precision),
-            score(c.recall),
-            int(c.support),
-          ],
+          cells: [c.label, score(c.precision), score(c.recall), int(c.support)],
         }))}
       />
       {conf && (
