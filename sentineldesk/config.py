@@ -51,6 +51,9 @@ class TriageConfig:
     # says "Critical" while the brief says "high", so both are accepted.
     high_priority_labels: tuple[str, ...] = ("high", "critical")
     incident_type_label: str = "Incident"
+    # Escalate when high-priority Incident precedents cast at least this share of
+    # the similarity-weighted vote.
+    min_incident_precedent_share: float = 0.5
 
     # Retrieval: how many precedents vote, and how many are shown and cited.
     retrieval_top_k: int = 10

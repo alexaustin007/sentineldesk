@@ -1,10 +1,11 @@
 """Escalation and routing rules: when to page a human, and how much compute to spend."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sentineldesk.config import LABEL_HEADS, TriageConfig, priority_severity
 from sentineldesk.policy_patterns import COMMITMENT_TOPICS, RISK_SIGNALS
+from sentineldesk.precedent_vote import similarity_weights
 from sentineldesk.schemas import (
     AUTO_DRAFT_READY,
     ESCALATE_IMMEDIATELY,
@@ -22,22 +23,47 @@ def is_high_priority_incident(labels: TicketLabels, config: TriageConfig) -> boo
     )
 
 
+def high_priority_incident_share(
+    precedents: Sequence[Precedent], config: TriageConfig
+) -> float:
+    """Share of the similarity-weighted vote cast by high-priority Incident precedents.
+
+    Each precedent must be both high priority and an Incident. Voting on the two
+    labels separately could add "high" from some neighbors to "Incident" from
+    others and raise a false alarm.
+    """
+    weights = similarity_weights(precedents)
+    total_weight = sum(weights)
+    if total_weight == 0:
+        return 0.0
+    incident_weight = sum(
+        weight
+        for precedent, weight in zip(precedents, weights)
+        if precedent.priority.lower() in config.high_priority_labels
+        and precedent.type == config.incident_type_label
+    )
+    return incident_weight / total_weight
+
+
 def find_mandatory_escalation(
-    agent_labels: Iterable[TicketLabels | None], config: TriageConfig
+    classifier_labels: TicketLabels,
+    precedents: Sequence[Precedent],
+    config: TriageConfig,
 ) -> list[str]:
     """High-priority incidents always go to the on-call engineer.
 
-    One agent is enough. This favors recall on purpose: a missed outage costs far
-    more than an extra page.
+    Either agent is enough. This favors recall on purpose: a missed outage costs
+    far more than an extra page.
     """
-    sources = [
-        labels.source
-        for labels in agent_labels
-        if labels is not None and is_high_priority_incident(labels, config)
-    ]
+    sources = []
+    if is_high_priority_incident(classifier_labels, config):
+        sources.append("the classifier")
+    incident_share = high_priority_incident_share(precedents, config)
+    if incident_share >= config.min_incident_precedent_share:
+        sources.append(f"{incident_share:.0%} of the precedent vote")
     if not sources:
         return []
-    return [f"High-priority Incident predicted by {', '.join(sources)}"]
+    return [f"High-priority Incident flagged by {' and '.join(sources)}"]
 
 
 def find_screening_issues(screening: ScreeningResult) -> list[str]:

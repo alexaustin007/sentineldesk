@@ -21,6 +21,21 @@ def test_detect_language(text: str, expected_language: str) -> None:
     assert detect_language(text) == expected_language
 
 
+@pytest.mark.parametrize(
+    ("text", "expected_language"),
+    [
+        ("cant login", "en"),
+        ("printer not working", "en"),
+        ("Outlook keeps crashing", "en"),
+        ("Passwort vergessen", "de"),
+        ("VPN geht nicht", "de"),
+        ("Hilfe, mein Laptop startet nicht", "de"),
+    ],
+)
+def test_detect_language_on_short_tickets(text: str, expected_language: str) -> None:
+    assert detect_language(text) == expected_language
+
+
 def test_mask_pii_keeps_dates() -> None:
     masked, counts = mask_pii(
         "Mail jane.doe@example.com or call +49 30 1234 5678 from 10.0.0.12. "

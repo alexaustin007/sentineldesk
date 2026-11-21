@@ -29,6 +29,7 @@ from sentineldesk.escalation import (
     find_risk_signals,
     find_screening_issues,
     find_unsupported_requests,
+    is_high_priority_incident,
 )
 from sentineldesk.guardrails import screen_ticket
 from sentineldesk.llm import LLMProvider, LLMUnavailableError
@@ -113,7 +114,7 @@ class TriageOrchestrator:
 
         # Mandatory escalation: page the on-call engineer without any LLM call.
         escalation_reasons = find_mandatory_escalation(
-            [classifier_labels, rag_labels, combined_labels], self.config
+            classifier_labels, retrieved, self.config
         )
         if escalation_reasons:
             return self._finish(result, timer, escalation_reasons, [])
@@ -196,9 +197,8 @@ class TriageOrchestrator:
             escalation_reasons.append(
                 f"Adversarial reviewer escalated: {review.rationale}"
             )
-        escalation_reasons.extend(
-            find_mandatory_escalation([result.final_labels], self.config)
-        )
+        if is_high_priority_incident(result.final_labels, self.config):
+            escalation_reasons.append("Reviewed labels are a high-priority Incident")
         return escalation_reasons, []
 
     def _draft_and_verify(

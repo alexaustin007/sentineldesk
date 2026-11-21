@@ -4,18 +4,30 @@ import re
 from collections import Counter
 from functools import partial
 
-from langdetect import DetectorFactory, LangDetectException, detect
+from langdetect import DetectorFactory, LangDetectException, detect_langs
 
 from sentineldesk.config import SUPPORTED_LANGUAGES
 from sentineldesk.schemas import ScreeningResult, Ticket
 
 DetectorFactory.seed = 0  # langdetect is random unless seeded
 
-# Common words that settle English vs. German when langdetect struggles with short text.
+# langdetect is reliable on full sentences but guesses wildly on short ticket text
+# ("cant login" reads as French), so short text is settled by common words first.
+_LONG_TEXT_WORDS = 12
 _LANGUAGE_HINTS: dict[str, set[str]] = {
-    "en": {"the", "and", "is", "not", "we", "our", "please", "since", "with", "for"},
-    "de": {"und", "der", "die", "das", "nicht", "ist", "ich", "wir", "bitte", "seit"},
-}
+    "en": {
+        "the", "and", "is", "are", "not", "we", "our", "my", "i", "it", "to", "on",
+        "of", "please", "since", "with", "for", "this", "after", "when", "help",
+        "can", "cannot", "cant", "can't", "dont", "don't", "doesnt", "doesn't",
+        "wont", "won't", "working", "keeps",
+    },
+    "de": {
+        "und", "der", "die", "das", "nicht", "ist", "ich", "wir", "bitte", "seit",
+        "mein", "meine", "mit", "für", "auf", "ein", "eine", "kann", "geht", "kein",
+        "keine", "zu", "wird", "haben", "sich", "unser", "unsere", "hilfe",
+        "funktioniert", "startet", "vergessen",
+    },
+}  # fmt: skip
 
 # Order matters: card and account numbers are masked before the looser phone pattern.
 _PII_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -64,21 +76,23 @@ _INJECTION_PATTERNS: list[re.Pattern[str]] = [
 
 def detect_language(text: str) -> str:
     """Return an ISO language code such as "en" or "de", or "unknown"."""
-    if not text.strip():
+    words = re.findall(r"[a-zäöüß']+", text.lower())
+    if not words:
         return "unknown"
     try:
-        detected = detect(text)
+        top_guess = detect_langs(text)[0]
+        detected, confidence = top_guess.lang, top_guess.prob
     except LangDetectException:
-        detected = "unknown"
-    if detected in SUPPORTED_LANGUAGES:
+        detected, confidence = "unknown", 0.0
+    if len(words) > _LONG_TEXT_WORDS and confidence >= 0.8:
         return detected
-    # langdetect is unreliable on very short text, so check common words too.
-    words = set(re.findall(r"[a-zäöüß]+", text.lower()))
+
     hint_counts = {
-        language: len(words & hints) for language, hints in _LANGUAGE_HINTS.items()
+        language: len(set(words) & hints) for language, hints in _LANGUAGE_HINTS.items()
     }
-    best_language = max(hint_counts, key=lambda language: hint_counts[language])
-    return best_language if hint_counts[best_language] >= 2 else detected
+    if hint_counts["en"] != hint_counts["de"]:
+        return max(hint_counts, key=lambda language: hint_counts[language])
+    return detected
 
 
 def find_pii(text: str) -> list[tuple[str, str]]:

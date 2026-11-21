@@ -14,7 +14,7 @@ def vote_on_labels(precedents: Sequence[Precedent]) -> TicketLabels | None:
     to its cosine similarity. Negative similarities count as zero. Returns None
     when no precedent carries any weight.
     """
-    weights = [max(precedent.similarity, 0.0) for precedent in precedents]
+    weights = similarity_weights(precedents)
     total_weight = sum(weights)
     if total_weight == 0:
         return None
@@ -29,6 +29,11 @@ def vote_on_labels(precedents: Sequence[Precedent]) -> TicketLabels | None:
             {label: score / total_weight for label, score in ranked}
         )
     return TicketLabels(source="rag_vote", **distributions)
+
+
+def similarity_weights(precedents: Sequence[Precedent]) -> list[float]:
+    """Voting weight of each precedent: its cosine similarity, floored at zero."""
+    return [max(precedent.similarity, 0.0) for precedent in precedents]
 
 
 def strongest_similarity(precedents: Sequence[Precedent]) -> float:
