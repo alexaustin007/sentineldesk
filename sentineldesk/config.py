@@ -5,6 +5,13 @@ historical split, never on the holdout.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Written by scripts/prepare_data.py (the official 80/20 split).
+PREPARED_DATA_DIR = PROJECT_ROOT / "data" / "prepared"
+# Written by `python -m sentineldesk.build_index`, loaded by the console.
+INDEX_DIR = PROJECT_ROOT / "artifacts" / "precedent_index"
 
 LABEL_HEADS: tuple[str, ...] = ("type", "queue", "priority")
 

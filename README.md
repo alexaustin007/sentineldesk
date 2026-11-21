@@ -56,11 +56,25 @@ python -m pip install -r requirements.txt
 python -m pytest
 ```
 
+After [preparing the local split](#prepare-the-local-split), embed the historical tickets once and save the index to `artifacts/precedent_index` (git ignores it). The multilingual model downloads, about 470 MB, on first use.
+
+```bash
+python -m sentineldesk.build_index
+```
+
+Check how well the precedent vote predicts labels on a validation slice of the historical split. It uses no holdout data.
+
+```bash
+python -m sentineldesk.rag_validation
+```
+
+Run the demo on sample tickets:
+
 ```bash
 python -m sentineldesk.demo
 ```
 
-Without a Gemini key, everything runs offline with a mock LLM. The demo uses TF-IDF retrieval on the mock tickets unless `SENTINEL_EMBEDDER=sentence-transformers` is set. The multilingual model downloads (about 470 MB) on first use.
+Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. Without a Gemini key, it uses a mock LLM.
 
 ### Configuration
 
@@ -79,9 +93,9 @@ Keep API keys in your shell or an untracked `.env` file. Tune the thresholds in 
 
 ### Integration points
 
-- **Data:** `load_historical_tickets()` in `sentineldesk/data_interface.py` returns mock tickets for now. Return the official historical split there. Pass the holdout ticket IDs to `PrecedentIndex.build(..., holdout_ticket_ids=...)` so the build fails if any holdout ticket gets indexed.
-- **Classifier:** Implement `predict(subject, body) -> TicketLabels`, or wrap three fitted scikit-learn models with `SklearnClassifierAdapter({"type": ..., "queue": ..., "priority": ...})`.
-- **UI:** Build one `TriageOrchestrator` and cache it, then call `triage(subject, body)` for each ticket. The returned `TriageResult` has the status, reasons, labels with confidence, precedents, draft, latency, tokens, and cost. `result.to_dict()` gives plain JSON.
+- **Data:** `load_historical_tickets()` in `sentineldesk/data_interface.py` reads `data/prepared/`. It joins the answers in `knowledge_base.csv` with the labels in `train.csv` by ticket ID, and refuses to continue if any ID from `holdout_inputs.csv` would be indexed.
+- **Classifier:** Implement `predict(subject, body) -> TicketLabels`, or wrap three fitted scikit-learn models with `SklearnClassifierAdapter({"type": ..., "queue": ..., "priority": ...})`. The adapter sends `{"subject", "body"}` records, matching `make_ticket_features()`.
+- **UI:** Call `create_orchestrator(classifier=...)` from `sentineldesk.app_factory` once and cache it, for example with `st.cache_resource`. Then call `triage(subject, body)` for each ticket. The returned `TriageResult` has the status, reasons, labels with confidence, precedents, draft, latency, tokens, and cost. `result.to_dict()` gives plain JSON.
 
 ## Contributing
 

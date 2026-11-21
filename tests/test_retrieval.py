@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from sentineldesk.data_interface import load_historical_tickets
+from sentineldesk.data_interface import load_mock_historical_tickets
 from sentineldesk.retrieval import PrecedentIndex, TfidfEmbedder
 from sentineldesk.schemas import ticket_text
 
@@ -36,7 +36,9 @@ def test_saved_index_returns_the_same_results(
 def test_holdout_tickets_cannot_be_indexed() -> None:
     with pytest.raises(ValueError, match="holdout"):
         PrecedentIndex.build(
-            load_historical_tickets(), TfidfEmbedder(), holdout_ticket_ids=["MOCK-0001"]
+            load_mock_historical_tickets(),
+            TfidfEmbedder(),
+            holdout_ticket_ids=["MOCK-0001"],
         )
 
 

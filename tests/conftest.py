@@ -5,7 +5,7 @@ from samples import TEST_CONFIG, OrchestratorFactory
 
 from sentineldesk.classifier_interface import MockClassifier, TicketClassifier
 from sentineldesk.config import TriageConfig
-from sentineldesk.data_interface import load_historical_tickets
+from sentineldesk.data_interface import load_mock_historical_tickets
 from sentineldesk.llm import LLMProvider, MockLLMProvider
 from sentineldesk.orchestrator import TriageOrchestrator
 from sentineldesk.retrieval import PrecedentIndex, TfidfEmbedder
@@ -13,7 +13,7 @@ from sentineldesk.retrieval import PrecedentIndex, TfidfEmbedder
 
 @pytest.fixture(scope="session")
 def precedent_index() -> PrecedentIndex:
-    return PrecedentIndex.build(load_historical_tickets(), TfidfEmbedder())
+    return PrecedentIndex.build(load_mock_historical_tickets(), TfidfEmbedder())
 
 
 @pytest.fixture

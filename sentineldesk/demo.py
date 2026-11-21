@@ -1,20 +1,21 @@
 """Try the workflow from the terminal: python -m sentineldesk.demo
 
-It uses the mock knowledge base and the mock classifier until teammates deliver the
-official split and the trained classifier. The LLM is Gemini when GEMINI_API_KEY is
-set, otherwise the offline mock. Set SENTINEL_EMBEDDER=sentence-transformers to use
-the multilingual embedding model instead of offline TF-IDF.
+Once scripts/prepare_data.py has run, the demo searches the real historical tickets
+(run `python -m sentineldesk.build_index` once so it loads in seconds). Otherwise it
+uses the 16 mock tickets with offline TF-IDF retrieval. The classifier stays the
+keyword mock until the trained one is plugged in. The LLM is Gemini when
+GEMINI_API_KEY is set, otherwise the offline mock.
 """
 
 import json
-import os
 
+from sentineldesk.app_factory import create_orchestrator
 from sentineldesk.classifier_interface import MockClassifier
 from sentineldesk.config import TriageConfig
-from sentineldesk.data_interface import load_historical_tickets
+from sentineldesk.data_interface import has_prepared_data, load_mock_historical_tickets
 from sentineldesk.llm import create_llm_provider
 from sentineldesk.orchestrator import TriageOrchestrator
-from sentineldesk.retrieval import PrecedentIndex, create_embedder
+from sentineldesk.retrieval import PrecedentIndex, TfidfEmbedder
 
 SAMPLE_TICKETS: list[tuple[str, str]] = [
     (
@@ -64,26 +65,31 @@ SUMMARY_FIELDS = (
 
 
 def build_demo_orchestrator() -> TriageOrchestrator:
-    embedder_kind = os.getenv("SENTINEL_EMBEDDER", "tfidf")
-    index = PrecedentIndex.build(
-        load_historical_tickets(), create_embedder(embedder_kind)
-    )
-    # TF-IDF similarities run lower than sentence-embedding similarities.
-    config = TriageConfig(min_top_similarity=0.3 if embedder_kind == "tfidf" else 0.45)
+    if has_prepared_data():
+        return create_orchestrator()
+    # Offline fallback. TF-IDF similarities run lower than sentence embeddings.
     return TriageOrchestrator(
         classifier=MockClassifier(),
-        precedent_index=index,
+        precedent_index=PrecedentIndex.build(
+            load_mock_historical_tickets(), TfidfEmbedder()
+        ),
         llm_provider=create_llm_provider(),
-        config=config,
+        config=TriageConfig(min_top_similarity=0.3),
     )
 
 
 def main() -> None:
     orchestrator = build_demo_orchestrator()
+    index = orchestrator.precedent_index
+    print(f"Knowledge base: {len(index.tickets)} tickets ({index.embedder.name})")
     print(f"LLM provider: {orchestrator.llm_provider.name}")
     for subject, body in SAMPLE_TICKETS:
         result = orchestrator.triage(subject, body)
         summary = {key: result.to_dict()[key] for key in SUMMARY_FIELDS}
+        summary["precedents"] = [
+            f"{precedent.ticket_id} ({precedent.similarity:.2f})"
+            for precedent in result.precedents
+        ]
         print(f"\n=== {subject} ===")
         print(json.dumps(summary, indent=2, ensure_ascii=False))
 
