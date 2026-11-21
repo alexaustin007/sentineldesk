@@ -7,6 +7,8 @@
 
 ---
 
+> **Data update:** The team has switched from the 20K prototype referenced below to the full three-file snapshot. For current counts, split membership, and training commands, see the [data preparation instructions](README.md#prepare-the-local-split).
+
 ## 1. Problem context
 
 Enterprise IT helpdesks process thousands of unstructured tickets daily. Two failure modes dominate:

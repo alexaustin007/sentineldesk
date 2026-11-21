@@ -3,26 +3,27 @@ SentinelDesk Hackathon project for multilingual incident triage and evidence-bac
 
 ## Hackathon dataset
 
-Use the organizer-recommended 20K CSV for development and evaluation. The dataset is published by Tobi-Bueck under CC BY-NC 4.0. [Download the CSV](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets/resolve/main/dataset-tickets-multi-lang-4-20k.csv) · [Hugging Face dataset card](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets)
-
-From the repository root, download a local copy.
+The team uses the full three-file snapshot of Tobi-Bueck's Customer Support Tickets dataset (CC BY-NC 4.0). Download all three CSVs from the pinned revision and prepare them with Python 3.10 or later. [Dataset card](https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets)
 
 ```bash
 mkdir -p data
-curl --fail --location --silent --show-error \
-  --output data/dataset-tickets-multi-lang-4-20k.csv \
-  https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets/resolve/main/dataset-tickets-multi-lang-4-20k.csv
+source_url=https://huggingface.co/datasets/Tobi-Bueck/customer-support-tickets/resolve/ddf1c81a5475992c4fa6752bf1e8b4e31f07bbeb
+for file in dataset-tickets-multi-lang-4-20k.csv aa_dataset-tickets-multi-lang-5-2-50-version.csv dataset-tickets-german_normalized_50_5_2.csv; do
+    curl --fail --location --silent --show-error --retry 2 "$source_url/$file" --output "data/$file" || break
+done
 ```
 
 ### Prepare the local split
 
-After downloading the CSV, run the preparation script with Python 3.10 or later. It uses the Python standard library.
-
 ```bash
-python3 scripts/prepare_data.py
+python3 scripts/prepare_data.py --dataset full
 ```
 
-The script assigns IDs from the original one-based CSV record number, trims surrounding whitespace, keeps blank subjects, and skips tickets with a blank body. It preserves label spelling and case. A seed-42 shuffle puts 80% of usable tickets (rounded down) into the historical split and reserves the rest for evaluation. Run the command again with the same source to reproduce the files in `data/prepared/`.
+Of 61,765 source records, 48,587 have type, queue, priority, and language. The other 13,178 have queue and priority only and lack resolutions. Preparation skips two blank bodies and collapses 8,309 repeated subject/body pairs to produce 40,276 distinct labeled inputs. Matching ignores case and whitespace. When copies differ, the first 20K record takes precedence, followed by file order in the newer labeled CSV. A duplicate can supply a missing answer. Blank subjects are supported.
+
+The seed-42 split keeps identical normalized bodies together, even across different subjects. Existing 20K training bodies stay in training. Existing holdout bodies stay in evaluation unless also present in the old training set. New body groups fill the remaining holdout allocation. Original 20K IDs stay stable; additional tickets use `TKT-V5-` plus the one-based source record number.
+
+The pinned snapshot yields **32,220 training tickets**, **32,214 historical resolutions**, and **8,056 held-out tickets**. Use the same preparation mode across the team and rebuild TF-IDF, classifiers, and the retrieval index when switching. To reproduce the prototype, download the 20K CSV and run `python3 scripts/prepare_data.py --dataset 20k`. Both modes write the same four files to `data/prepared/`.
 
 | Local file | Columns | Use |
 | --- | --- | --- |
@@ -65,7 +66,7 @@ Ruff uses four spaces per indentation level. Commit your changes, push your bran
 
 ## TF-IDF features for classification
 
-Start with the local `data/prepared/train.csv` from [data preparation](https://github.com/alexaustin007/sentineldesk/pull/2). Install the dependency with `python -m pip install -r requirements.txt`. From the repository root:
+Start with the local `data/prepared/train.csv` from the [local split](#prepare-the-local-split). Install the dependency with `python -m pip install -r requirements.txt`. From the repository root:
 
 ```python
 import csv
