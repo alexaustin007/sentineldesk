@@ -12,13 +12,15 @@ class TicketFeaturesTest(unittest.TestCase):
             {"subject": "VPN down", "body": "Verbindung gestört"},
         ]
         matrix = features.fit_transform(rows)
-        vocab = features.named_steps["tfidf"].vocabulary_
-        self.assertIn("vpn down", vocab)
-        self.assertIn("verbindung gestört", vocab)
-        self.assertNotIn("hiddenlabel", vocab)
-        self.assertNotIn("hiddenanswer", vocab)
+
+        # Word vocab is inside the FeatureUnion
+        word_vocab = features.named_steps["tfidf"].transformer_list[0][1].vocabulary_
+        self.assertIn("vpn down", word_vocab)
+        self.assertIn("verbindung gestört", word_vocab)
+        self.assertNotIn("hiddenlabel", word_vocab)
+        self.assertNotIn("hiddenanswer", word_vocab)
 
         live = features.transform([{"body": "Verbindung gestört"}, {"body": "newterm"}])
         self.assertEqual(live.shape[1], matrix.shape[1])
         self.assertEqual(live[1].nnz, 0)
-        self.assertNotIn("newterm", vocab)
+        self.assertNotIn("newterm", word_vocab)
