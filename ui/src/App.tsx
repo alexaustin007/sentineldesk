@@ -133,7 +133,7 @@ export function App() {
           </div>
         </div>
       </header>
-      {route === "/" && <ConsolePage onCompleted={recordCompletion} />}
+      <ConsolePage active={route === "/"} onCompleted={recordCompletion} />
       {route === "/metrics" && (
         <div className="px-6 py-6">
           {!USE_MOCK && (

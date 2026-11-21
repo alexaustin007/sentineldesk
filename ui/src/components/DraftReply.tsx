@@ -27,11 +27,11 @@ export function DraftReply({
   const MAIN = "border-line-strong shadow-[0_1px_3px_rgb(0_0_0/0.06)]";
 
   if (!draft) {
-    // The reason decides the line (PR #5: escalate pages first; screening blocks return early).
+    // The reason decides the line (PR #5: escalation takes priority; screening blocks return early).
     const codes = new Set((res.escalation?.reasons ?? []).map((r) => r.code));
     const blocked = codes.has("PROMPT_INJECTION") || codes.has("UNSUPPORTED_LANGUAGE") || res.input?.language_supported === false;
     const line = escalated
-      ? "No draft: paged on-call before drafting"
+      ? "Flagged for on-call review before drafting a reply."
       : blocked
         ? "No draft: blocked by guardrails before drafting"
         : codes.has("LOW_SIMILARITY")

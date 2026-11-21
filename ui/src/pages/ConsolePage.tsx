@@ -6,7 +6,7 @@ import type { RunState } from "../lib/run";
 import type { Sample } from "../mocks";
 import type { TriageRequest, TriageResponse } from "../types/triage";
 
-export function ConsolePage({ onCompleted }: { onCompleted: (res: TriageResponse) => void }) {
+export function ConsolePage({ active, onCompleted }: { active: boolean; onCompleted: (res: TriageResponse) => void }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [bodyError, setBodyError] = useState(false);
@@ -55,6 +55,7 @@ export function ConsolePage({ onCompleted }: { onCompleted: (res: TriageResponse
   }, [body, subject, run.kind, start]);
 
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -63,7 +64,7 @@ export function ConsolePage({ onCompleted }: { onCompleted: (res: TriageResponse
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [submit]);
+  }, [active, submit]);
 
   useEffect(() => () => inflight.current?.abort(), []);
 
@@ -93,6 +94,8 @@ export function ConsolePage({ onCompleted }: { onCompleted: (res: TriageResponse
     onSubmit: submit,
     bodyError,
   };
+
+  if (!active) return null;
 
   // Entry-first: before the first submit (or after "New ticket") only the ticket entry is shown.
   if (run.kind === "idle") return <EntryView {...fields} />;
