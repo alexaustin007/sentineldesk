@@ -1,5 +1,6 @@
 """Assemble the triage workflow for the console and the demo in one call."""
 
+import os
 from pathlib import Path
 
 from sentineldesk.classifier_interface import (
@@ -47,5 +48,11 @@ def create_orchestrator(
         classifier=classifier or load_classifier(),
         precedent_index=load_precedent_index(index_dir),
         llm_provider=create_llm_provider(),
-        config=config or TriageConfig(),
+        config=config
+        or TriageConfig(
+            independent_draft_review=os.getenv("SENTINEL_INDEPENDENT_DRAFT_REVIEW", "")
+            .strip()
+            .lower()
+            in {"1", "true"}
+        ),
     )

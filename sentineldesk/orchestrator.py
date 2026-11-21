@@ -36,6 +36,7 @@ from sentineldesk.escalation import (
     high_priority_incident_share,
     is_high_priority_incident,
 )
+from sentineldesk.grounding_review import run_grounding_review
 from sentineldesk.guardrails import screen_ticket
 from sentineldesk.llm import LLMProvider, LLMUnavailableError
 from sentineldesk.precedent_vote import strongest_similarity, vote_on_labels
@@ -185,7 +186,44 @@ class TriageOrchestrator:
 
         if has_evidence:
             review_reasons.extend(self._draft_and_verify(result, timer, screening))
+        if (
+            self.config.independent_draft_review
+            and result.draft_reply
+            and not review_reasons
+        ):
+            reason = self._check_draft_evidence(result, timer, screening)
+            if reason:
+                result.verification_issues.append(reason)
+                review_reasons.append(reason)
         return self._finish(result, timer, [], review_reasons)
+
+    def _check_draft_evidence(
+        self, result: TriageResult, timer: StageTimer, screening: ScreeningResult
+    ) -> str | None:
+        # The console allows 30 s. Reserve time for the response and skip a
+        # reviewer call that cannot finish within the remaining budget.
+        remaining_ms = int(27_000 - timer.elapsed_ms())
+        if remaining_ms < 1_000:
+            return "Draft evidence review ran out of time"
+        try:
+            with timer.stage("grounding_review"):
+                verdict, record = run_grounding_review(
+                    self.llm_provider,
+                    screening,
+                    result.draft_reply,
+                    result.precedents,
+                    remaining_ms,
+                )
+        except LLMUnavailableError:
+            return "Draft evidence review unavailable"
+        result.llm_calls.append(record)
+        if verdict is None:
+            return "Draft evidence reviewer returned an invalid verdict"
+        if not verdict.valid_citations:
+            return "Draft evidence reviewer rejected a cited ticket"
+        if not verdict.grounded or verdict.recommend_escalation:
+            return "Draft evidence reviewer could not confirm support for the reply"
+        return None
 
     def _review(
         self,

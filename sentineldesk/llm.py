@@ -82,6 +82,7 @@ class LLMRequest:
     attachments: tuple[Attachment, ...] = ()
     # Structured inputs behind the prompt. The mock provider builds answers from them.
     context: dict[str, Any] = field(default_factory=dict)
+    timeout_ms: int | None = None
 
 
 @dataclass(frozen=True)
@@ -121,9 +122,8 @@ class GeminiProvider:
 
         # Cap each call so two deep-path calls finish inside the console's 30 s
         # timeout. A call that times out counts as unavailable (human review).
-        http_options = types.HttpOptions(
-            timeout=int(os.getenv("SENTINEL_LLM_TIMEOUT_MS", "12000"))
-        )
+        self._timeout_ms = int(os.getenv("SENTINEL_LLM_TIMEOUT_MS", "12000"))
+        http_options = types.HttpOptions(timeout=self._timeout_ms)
         if enterprise:
             project = os.getenv("GOOGLE_CLOUD_PROJECT")
             if not project:
@@ -147,6 +147,12 @@ class GeminiProvider:
 
         settings = self._settings[request.tier]
         config = types.GenerateContentConfig(
+            http_options=types.HttpOptions(
+                timeout=min(self._timeout_ms, request.timeout_ms),
+                retry_options=types.HttpRetryOptions(attempts=1),
+            )
+            if request.timeout_ms is not None
+            else None,
             system_instruction=request.system_prompt,
             response_mime_type="application/json" if request.response_schema else None,
             response_schema=request.response_schema,
