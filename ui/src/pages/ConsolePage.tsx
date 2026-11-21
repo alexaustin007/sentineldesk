@@ -4,9 +4,9 @@ import { EntryView } from "../components/EntryView";
 import { TimeoutError, TriageError, triage } from "../lib/api";
 import type { RunState } from "../lib/run";
 import type { Sample } from "../mocks";
-import type { TriageRequest } from "../types/triage";
+import type { TriageRequest, TriageResponse } from "../types/triage";
 
-export function ConsolePage() {
+export function ConsolePage({ onCompleted }: { onCompleted: (res: TriageResponse) => void }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [bodyError, setBodyError] = useState(false);
@@ -27,6 +27,7 @@ export function ConsolePage() {
     try {
       const res = await triage(req, ctrl.signal);
       if (id !== runId.current) return;
+      onCompleted(res);
       setResultBody(req.body);
       setRun({ kind: "success", res, runId: id });
     } catch (e) {
@@ -38,7 +39,7 @@ export function ConsolePage() {
       else if (e instanceof TriageError) setRun({ kind: "error", code: e.code, message: e.message, elapsedMs });
       else setRun({ kind: "error", code: "CLIENT", message: e instanceof Error ? e.message : String(e), elapsedMs });
     }
-  }, []);
+  }, [onCompleted]);
 
   const submit = useCallback(() => {
     if (run.kind === "loading") return;

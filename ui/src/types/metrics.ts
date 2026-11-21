@@ -35,6 +35,7 @@ export interface DraftQuality {
 export interface Metrics {
   /** true in the bundled example; the UI shows a "sample data" notice. */
   sample?: boolean;
+  evaluation_scope?: "classifier";
   generated_at?: string;
   model?: string;
   dataset?: string;

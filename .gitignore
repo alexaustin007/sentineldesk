@@ -14,3 +14,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+
+# Aggregate report generated for each UI release
+/ui/public/metrics.json
