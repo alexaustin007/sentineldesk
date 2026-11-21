@@ -21,6 +21,8 @@ _NUMBER_PATTERN = re.compile(r"\d+(?:[.,]\d+)?")
 # a capital letter, so "Do X. [TKT-00042] Do Y." keeps each citation with its sentence.
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?\]])\s+(?=[A-ZÄÖÜ\"'])")
 _URL_PATTERN = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
+# Template slots from the historical answers, such as <name> or <tel_num>.
+TEMPLATE_PLACEHOLDER = re.compile(r"<(?!br>)[a-z_]+>")
 _LEAK_MARKERS = re.compile(
     r"system prompt|my instructions|as an ai\b|</?ticket>", re.IGNORECASE
 )
@@ -50,9 +52,14 @@ def verify_reply(
             continue
         kept_sentences = []
         for sentence in _SENTENCE_BOUNDARY.split(line):
-            problems = unsupported_claims(sentence, evidence_text) + unknown_citations(
-                sentence, evidence_ids
-            )
+            problems = [
+                *unsupported_claims(sentence, evidence_text),
+                *unknown_citations(sentence, evidence_ids),
+                *(
+                    f"template placeholder {placeholder}"
+                    for placeholder in TEMPLATE_PLACEHOLDER.findall(sentence)
+                ),
+            ]
             if problems:
                 removed_claims.append(sentence)
                 issues.append(f"Removed ({'; '.join(problems)}): {sentence}")

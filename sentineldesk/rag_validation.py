@@ -32,7 +32,7 @@ def validate_precedent_agent(
     index = PrecedentIndex.build(historical.drop(validation.index), create_embedder())
 
     predicted: dict[str, list[str]] = {head: [] for head in LABEL_HEADS}
-    top_similarities, flagged = [], []
+    top_similarities, incident_shares = [], []
     started = time.perf_counter()
     for ticket in validation.to_dict("records"):
         precedents = index.search(
@@ -42,15 +42,13 @@ def validate_precedent_agent(
         for head in LABEL_HEADS:
             predicted[head].append(vote.head(head).label if vote else "")
         top_similarities.append(strongest_similarity(precedents))
-        share = high_priority_incident_share(precedents, config)
-        flagged.append(share >= config.min_incident_precedent_share)
+        incident_shares.append(high_priority_incident_share(precedents, config))
     seconds_per_ticket = (time.perf_counter() - started) / sample_size
 
     is_high_priority_incident = (
         validation["priority"].str.lower().isin(config.high_priority_labels)
         & (validation["type"] == config.incident_type_label)
     ).tolist()
-    caught = sum(f and truth for f, truth in zip(flagged, is_high_priority_incident))
     return {
         "validation_tickets": sample_size,
         "indexed_tickets": len(index.tickets),
@@ -66,9 +64,13 @@ def validate_precedent_agent(
         },
         "high_priority_incidents": {
             "actual": sum(is_high_priority_incident),
-            "flagged": sum(flagged),
-            "recall": round(caught / max(sum(is_high_priority_incident), 1), 3),
-            "precision": round(caught / max(sum(flagged), 1), 3),
+            # How the precedent agent alone would do at each escalation share.
+            **{
+                f"share_at_least_{threshold}": flagging_quality(
+                    incident_shares, is_high_priority_incident, threshold
+                )
+                for threshold in (0.3, 0.4, 0.5)
+            },
         },
         "top_similarity_percentiles": {
             f"p{percentile}": round(
@@ -77,6 +79,19 @@ def validate_precedent_agent(
             for percentile in (5, 10, 25, 50, 75)
         },
         "retrieval_ms_per_ticket": round(seconds_per_ticket * 1000, 1),
+    }
+
+
+def flagging_quality(
+    shares: list[float], truth: list[bool], threshold: float
+) -> dict[str, float]:
+    """Recall and precision of flagging tickets whose share reaches `threshold`."""
+    flagged = [share >= threshold for share in shares]
+    caught = sum(was_flagged and actual for was_flagged, actual in zip(flagged, truth))
+    return {
+        "flagged": sum(flagged),
+        "recall": round(caught / max(sum(truth), 1), 3),
+        "precision": round(caught / max(sum(flagged), 1), 3),
     }
 
 

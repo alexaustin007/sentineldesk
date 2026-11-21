@@ -59,8 +59,13 @@ class TriageConfig:
     high_priority_labels: tuple[str, ...] = ("high", "critical")
     incident_type_label: str = "Incident"
     # Escalate when high-priority Incident precedents cast at least this share of
-    # the similarity-weighted vote.
-    min_incident_precedent_share: float = 0.5
+    # the similarity-weighted vote. On a 500-ticket historical validation slice,
+    # 0.4 caught 65% of high-priority incidents at 57% precision (0.3: 78% / 49%,
+    # 0.5: 44% / 77%). The classifier can escalate on its own as well.
+    min_incident_precedent_share: float = 0.4
+
+    # Tickets shorter than this go to a human instead of an automated reply.
+    min_ticket_words: int = 2
 
     # Retrieval: how many precedents vote, and how many are shown and cited.
     retrieval_top_k: int = 10
@@ -72,4 +77,7 @@ class TriageConfig:
 
     # Fast-path requirements.
     min_head_confidence: float = 0.55
-    min_top_similarity: float = 0.45
+    # Below this best-match similarity there is no grounded answer. With the
+    # multilingual index, 95% of historical validation tickets score above 0.77,
+    # short realistic tickets 0.63 to 0.85, and off-topic text 0.22 to 0.32.
+    min_top_similarity: float = 0.5

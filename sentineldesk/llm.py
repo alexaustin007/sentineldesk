@@ -251,7 +251,11 @@ def _mock_reply(context: dict[str, Any]) -> str:
     """Template reply that reuses the top precedent's resolution and cites it."""
     citation = context.get("top_ticket_id", "")
     sentences = re.split(r"(?<=[.!?])\s+", str(context.get("top_answer", "")).strip())
-    resolution = " ".join(sentences[:2])
+    # Like an instructed model, skip sentences with template slots such as <name>.
+    usable = [
+        sentence for sentence in sentences if not re.search(r"<[a-z_]+>", sentence)
+    ]
+    resolution = " ".join(usable[:2])
     if context.get("language") == "de":
         return (
             f"Hallo,\n\nvielen Dank für Ihre Nachricht. {resolution} [{citation}]\n\n"

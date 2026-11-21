@@ -91,6 +91,31 @@ def test_prompt_injection_goes_to_human_without_llm(
     assert "prompt injection" in result.reasons[0]
 
 
+def test_one_word_ticket_goes_to_human_without_llm(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    result = make_orchestrator().triage("", "hello")
+
+    assert result.status == HUMAN_REVIEW
+    assert result.llm_calls == []
+    assert "Too little detail" in result.reasons[0]
+
+
+def test_weak_evidence_cannot_vote_or_escalate(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    routine = FixedClassifier(labels_from_choices("Request", "IT Support", "low", 0.9))
+    strict_config = replace(TEST_CONFIG, min_top_similarity=0.99)
+
+    result = make_orchestrator(classifier=routine, config=strict_config).triage(
+        "VPN down for the entire hospital network",
+        "Since 8am none of our clinicians can connect through the VPN.",
+    )
+
+    assert result.rag_labels is None
+    assert not any("precedent vote" in reason for reason in result.reasons)
+
+
 def test_unsupported_language_goes_to_human(
     make_orchestrator: OrchestratorFactory,
 ) -> None:

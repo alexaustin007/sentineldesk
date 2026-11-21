@@ -32,7 +32,7 @@ def format_precedents(precedents: Sequence[Precedent]) -> str:
     blocks = []
     for precedent in precedents:
         subject, _ = mask_pii(precedent.subject)
-        answer, _ = mask_pii(precedent.answer)
+        answer, _ = mask_pii(precedent.answer.replace("<br>", " "))
         blocks.append(
             f"[{precedent.ticket_id}] similarity {precedent.similarity:.2f} | "
             f"{precedent.type} / {precedent.queue} / {precedent.priority} | "

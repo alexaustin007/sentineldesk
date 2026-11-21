@@ -1,5 +1,6 @@
 """Escalation and routing rules: when to page a human, and how much compute to spend."""
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -64,6 +65,14 @@ def find_mandatory_escalation(
     if not sources:
         return []
     return [f"High-priority Incident flagged by {' and '.join(sources)}"]
+
+
+def find_missing_detail(screening: ScreeningResult, config: TriageConfig) -> list[str]:
+    """A near-empty ticket gives neither agent anything to judge."""
+    word_count = len(re.findall(r"\w+", screening.masked_text))
+    if word_count < config.min_ticket_words:
+        return [f"Too little detail to triage automatically ({word_count} words)"]
+    return []
 
 
 def find_screening_issues(screening: ScreeningResult) -> list[str]:

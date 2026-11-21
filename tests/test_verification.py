@@ -65,6 +65,19 @@ def test_citation_to_unretrieved_ticket_fails() -> None:
     assert "Reply cites no retrieved historical ticket" in result.issues
 
 
+def test_template_placeholder_is_removed() -> None:
+    draft = (
+        "Please reinstall the VPN client and restart your laptop. [MOCK-0002] "
+        "Call us at <tel_num> if it fails."
+    )
+
+    result = verify_reply(draft, VPN_EVIDENCE, "en")
+
+    assert not result.passed
+    assert result.removed_claims == ["Call us at <tel_num> if it fails."]
+    assert "<tel_num>" not in result.cleaned_reply
+
+
 def test_personal_data_in_reply_fails() -> None:
     draft = (
         "Please reinstall the VPN client and restart your laptop [MOCK-0002], "

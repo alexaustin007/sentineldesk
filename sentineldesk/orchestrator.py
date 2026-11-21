@@ -3,8 +3,10 @@
 For each ticket:
 1. Guardrails screen the input (language, prompt injection, PII masking).
 2. Agent 1, the external classifier, predicts type, queue, and priority.
-3. Agent 2, the RAG engine, retrieves precedents and votes on the same labels.
-4. A high-priority Incident from any agent escalates immediately.
+3. Agent 2, the RAG engine, retrieves precedents and, when they are genuinely
+   similar, votes on the same labels.
+4. A near-empty ticket goes to a human. A high-priority Incident from either agent
+   escalates immediately.
 5. Agreement, confidence, evidence, and low risk lead to the fast path (a Flash-Lite
    draft). Anything else takes the deep path (Flash adversarial review, then a
    Flash draft).
@@ -26,6 +28,7 @@ from sentineldesk.escalation import (
     choose_route,
     decide_status,
     find_mandatory_escalation,
+    find_missing_detail,
     find_risk_signals,
     find_screening_issues,
     find_unsupported_requests,
@@ -94,7 +97,12 @@ class TriageOrchestrator:
             retrieved = self.precedent_index.search(
                 ticket.text, top_k=self.config.retrieval_top_k
             )
-            rag_labels = vote_on_labels(retrieved)
+        top_similarity = strongest_similarity(retrieved)
+        has_evidence = top_similarity >= self.config.min_top_similarity
+        # The precedent agent votes only when it found genuinely similar tickets;
+        # otherwise its neighbors are unrelated and their labels are noise.
+        voting_precedents = retrieved if has_evidence else []
+        rag_labels = vote_on_labels(voting_precedents)
         combined_labels = blend_predictions(
             classifier_labels, rag_labels, self.config.classifier_weight
         )
@@ -112,9 +120,14 @@ class TriageOrchestrator:
             injection_signals=screening.injection_signals,
         )
 
+        # A near-empty ticket gives neither agent anything to judge.
+        missing_detail = find_missing_detail(screening, self.config)
+        if missing_detail:
+            return self._finish(result, timer, [], missing_detail)
+
         # Mandatory escalation: page the on-call engineer without any LLM call.
         escalation_reasons = find_mandatory_escalation(
-            classifier_labels, retrieved, self.config
+            classifier_labels, voting_precedents, self.config
         )
         if escalation_reasons:
             return self._finish(result, timer, escalation_reasons, [])
@@ -125,8 +138,6 @@ class TriageOrchestrator:
             return self._finish(result, timer, [], review_reasons)
 
         # Decide how much compute this ticket deserves.
-        top_similarity = strongest_similarity(retrieved)
-        has_evidence = top_similarity >= self.config.min_top_similarity
         risk_signals = find_risk_signals(screening.masked_text)
         unsupported_requests = find_unsupported_requests(
             screening.masked_text, result.precedents
