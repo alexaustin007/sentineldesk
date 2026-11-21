@@ -71,6 +71,7 @@ class TestClassifyTicket(unittest.TestCase):
         self.assertIn("priority", result["confidence"])
 
         self.assertIn("classification_margin", result)
+        self.assertIn("critical_incident_risk", result)
         self.assertIn("escalation", result)
         self.assertIn("required", result["escalation"])
         self.assertIn("reasons", result["escalation"])
@@ -83,11 +84,15 @@ class TestClassifyTicket(unittest.TestCase):
                 ["Change", "Incident", "Problem", "Request"],
                 [0.02, 0.90, 0.05, 0.03],
             ),
-            "queue": self._make_mock_pipeline(["Technical Support"], [1.0]),
+            "queue": self._make_mock_pipeline(
+                ["Technical Support", "Product Support"],
+                [0.95, 0.05],
+            ),
             "priority": self._make_mock_pipeline(
                 ["high", "low", "medium"],
                 [0.85, 0.05, 0.10],
             ),
+            "critical": self._make_mock_pipeline([0, 1], [0.1, 0.9]),
         }
 
         result = classify_ticket(
@@ -97,7 +102,7 @@ class TestClassifyTicket(unittest.TestCase):
         )
 
         self.assertTrue(result["escalation"]["required"])
-        self.assertTrue(any("Incident" in r for r in result["escalation"]["reasons"]))
+        self.assertGreater(result["critical_incident_risk"], 0.5)
 
     def test_no_escalation_on_routine_ticket(self) -> None:
         pipelines = {

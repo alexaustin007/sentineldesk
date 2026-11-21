@@ -24,12 +24,18 @@ TRAIN_CSV = DATA_DIR / "train.csv"
 MODEL_DIR = PROJECT_ROOT / "classification" / "models"
 
 TARGETS = ("type", "queue", "priority")
+CRITICAL_INCIDENT_THRESHOLD = 0.3
 
 
-def _make_svm_pipeline() -> Pipeline:
+def _make_svm_pipeline(class_weight: str | None = None) -> Pipeline:
     features = make_ticket_features()
     features.steps.append(
-        ("clf", CalibratedClassifierCV(LinearSVC(max_iter=10_000), cv=5))
+        (
+            "clf",
+            CalibratedClassifierCV(
+                LinearSVC(max_iter=10_000, class_weight=class_weight), cv=5
+            ),
+        )
     )
     return features
 
@@ -51,14 +57,36 @@ def train_and_save() -> dict[str, Pipeline]:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     pipelines: dict[str, Pipeline] = {}
 
+    # Type is well-balanced — no class weighting needed.
+    # Queue and priority need balanced weights to fix minority-class recall.
+    target_weights: dict[str, str | None] = {
+        "type": None,
+        "queue": "balanced",
+        "priority": "balanced",
+    }
+
     for target in TARGETS:
-        print(f"Training {target} classifier …")
-        pipe = _make_svm_pipeline()
+        weight = target_weights[target]
+        label = f"{target} (class_weight={weight})" if weight else target
+        print(f"Training {label} classifier …")
+        pipe = _make_svm_pipeline(class_weight=weight)
         pipe.fit(tickets, df[target])
         path = MODEL_DIR / f"svm_{target}.joblib"
         joblib.dump(pipe, path)
         pipelines[target] = pipe
         print(f"  Saved to {path}")
+
+    # Critical incident binary classifier (Section 3.2)
+    print("Training critical incident classifier …")
+    df["critical"] = ((df["type"] == "Incident") & (df["priority"] == "high")).astype(
+        int
+    )
+    pipe = _make_svm_pipeline(class_weight="balanced")
+    pipe.fit(tickets, df["critical"])
+    path = MODEL_DIR / "svm_critical.joblib"
+    joblib.dump(pipe, path)
+    pipelines["critical"] = pipe
+    print(f"  Saved to {path}")
 
     return pipelines
 
@@ -66,7 +94,7 @@ def train_and_save() -> dict[str, Pipeline]:
 def load_models(model_dir: Path = MODEL_DIR) -> dict[str, Pipeline]:
     """Load saved pipelines from disk."""
     pipelines: dict[str, Pipeline] = {}
-    for target in TARGETS:
+    for target in (*TARGETS, "critical"):
         path = model_dir / f"svm_{target}.joblib"
         pipelines[target] = joblib.load(path)
     return pipelines
@@ -101,24 +129,41 @@ def classify_ticket(
         second = sorted_proba[1] if len(sorted_proba) > 1 else 0.0
         margins[target] = round(float(sorted_proba[0] - second), 4)
 
-    is_critical = (
+    # Critical incident risk from dedicated binary classifier (Section 3.2)
+    critical_risk = 0.0
+    if "critical" in pipelines:
+        critical_proba = pipelines["critical"].predict_proba(ticket)[0]
+        critical_classes = list(pipelines["critical"].classes_)
+        if 1 in critical_classes:
+            critical_risk = round(float(critical_proba[critical_classes.index(1)]), 4)
+
+    is_critical_by_rule = (
         predictions["type"] == "Incident" and predictions["priority"] == "high"
     )
 
+    # Escalation gate (Section 7.3) — four independent conditions
     escalation_reasons: list[str] = []
-    if is_critical:
+
+    # Condition 1: dedicated critical incident classifier
+    if critical_risk >= CRITICAL_INCIDENT_THRESHOLD:
+        escalation_reasons.append(f"High critical-incident risk ({critical_risk:.2f})")
+
+    # Condition 2: rule-based backup (both classifiers agree)
+    if is_critical_by_rule:
         escalation_reasons.append(
             "Predicted high-priority Incident (type + priority classifiers agree)"
         )
+
+    # Condition 3: narrow classification margin
     for target in TARGETS:
-        if confidences[target] < 0.4:
-            escalation_reasons.append(
-                f"Low confidence on {target} ({confidences[target]:.2f})"
-            )
-        if margins[target] < 0.15:
+        if margins[target] < 0.10:
             escalation_reasons.append(
                 f"Narrow margin on {target} ({margins[target]:.2f})"
             )
+
+    # Condition 4: low confidence fallback
+    if confidences["type"] < 0.3:
+        escalation_reasons.append(f"Low confidence on type ({confidences['type']:.2f})")
 
     elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
 
@@ -127,6 +172,7 @@ def classify_ticket(
         "predicted_queue": predictions["queue"],
         "predicted_priority": predictions["priority"],
         "confidence": confidences,
+        "critical_incident_risk": critical_risk,
         "classification_margin": margins,
         "escalation": {
             "required": len(escalation_reasons) > 0,
