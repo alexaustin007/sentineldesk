@@ -1,11 +1,12 @@
 import type { TriageRequest, TriageResponse } from "../types/triage";
 import { deBilling } from "./deBilling";
+import { humanReviewDeep } from "./humanReviewDeep";
 import { injection } from "./injection";
 import { knowledgeGap } from "./knowledgeGap";
 import { lowConfidence } from "./lowConfidence";
 import { vpnOutage } from "./vpnOutage";
 
-export { deBilling, injection, knowledgeGap, lowConfidence, vpnOutage };
+export { deBilling, humanReviewDeep, injection, knowledgeGap, lowConfidence, vpnOutage };
 
 export interface Sample {
   id: string;
@@ -33,6 +34,7 @@ function guess(text: string): TriageResponse {
   if (/ignore (all |any )?previous|system note|disregard/.test(text)) return injection;
   if (/[äöüß]|\b(und|ich|bitte|danke|nicht)\b/.test(text)) return deBilling;
   if (/vpn|outage|down|offline/.test(text)) return vpnOutage;
+  if (/sso|locked out|charged twice|refund/.test(text)) return humanReviewDeep;
   if (text.trim().split(/\s+/).length < 5) return lowConfidence;
   return knowledgeGap;
 }

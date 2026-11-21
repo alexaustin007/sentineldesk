@@ -40,21 +40,30 @@ If the team is short on people, fall back to Streamlit but still follow the cont
 Endpoint: `POST /api/triage`, body `{ "subject": string | null, "body": string }`.
 Full response example: [`contracts/triage_response.example.json`](../contracts/triage_response.example.json).
 
+Updated 2026-11-21 to match Chase's RAG pipeline (team PR #5, `sentineldesk/orchestrator.py`) and Ivy's classification plan (`CLASSIFICATION_PLAN.md` §7.3, §9.2). §3.2 maps their output to these fields.
+
 | Field | Owner | Notes |
 |---|---|---|
-| `input.language_detected` | classifier/RAG | `en` or `de`, detected from the raw text |
-| `input.pii_masked[]` | guardrails | empty list if the PII bonus isn't built |
-| `classification.{type,queue,priority}` | classifier | `label`, calibrated `confidence` 0–1, optional `alternatives` |
-| `escalation.status` | gate | `"auto_draft"` or `"escalate"` |
-| `escalation.reasons[]` | gate | stable `code` + human `message`. Codes: `HIGH_PRIORITY_INCIDENT`, `LOW_CONFIDENCE`, `LOW_SIMILARITY`, `UNSUPPORTED_REQUEST`, `PROMPT_INJECTION` |
-| `guardrails.*` | guardrails | `flagged` + `evidence` string for the UI to quote |
-| `precedents[]` | retriever | 3–5 items, sorted by `similarity` desc. **Only from the kb_train split** |
-| `draft.text` / `draft.citations[]` | generator | citations are written inline as `[TKT-xxxxx]` so the UI can turn them into links |
-| `latency_ms.total` + stage timings | backend | stage timings are optional, but they make a good demo |
+| `input.language_detected` | guardrails | `en` or `de` (other codes possible), detected from the raw text |
+| `input.language_supported` | guardrails | `false` for anything but EN/DE, which goes to human review |
+| `input.pii_counts` | guardrails | e.g. `{ "email": 1, "phone": 1 }`; `{}` if none |
+| `classification.{type,queue,priority}` | classifier (+ precedent vote) | `label`, calibrated `confidence` 0–1, optional `margin` (top minus second probability, Ivy) and `alternatives` |
+| `classification.critical_incident_risk` | classifier | Ivy's dedicated risk score 0–1, or `null` until it's wired in |
+| `classification.disagreements[]` | orchestrator | heads where the classifier and precedent vote disagree, e.g. `"queue"` |
+| `escalation.status` | gate | `"auto_draft"`, `"human_review"` or `"escalate"` |
+| `escalation.reasons[]` | gate | `message` is a human sentence and is **always shown**. `code` is a best-effort tag (see §3.1). The UI never depends on it to render. |
+| `escalation.thresholds` | gate | `confidence`, `similarity`, `critical_incident_risk` (nullable): echoed from config so the UI can draw ticks and the "Why?" checklist |
+| `route.path` / `route.reasons[]` | orchestrator | `"fast"`, `"deep"` (adversarial review ran) or `"none"` (stopped before routing) |
+| `guardrails.prompt_injection` / `unsupported_request` | guardrails | `flagged` + `evidence` string for the UI to quote |
+| `guardrails.injection_signals[]`, `removed_claims[]`, `verification_issues[]` | guardrails / verifier | `removed_claims` are draft sentences deleted because they promised refunds, amounts, deadlines or guarantees without evidence. **Show them**: it's visible proof against hallucination. |
+| `precedents[]` | retriever | 3–5 items, sorted by `similarity` desc, **only from the historical split**. `answer_snippet` is always sent. `body` (the past customer message) and `answer` (the full resolution) power the expanded row. `language`, `subject`, `body` and `answer` may be missing until PR #5 exports them, and the UI must cope (fall back to the snippet). |
+| `draft` | generator | `{ text, language, citations[] }` or `null`. Citations are inline `[TKT-xxxxx]` (same pattern as PR #5's verifier) |
+| `latency_ms.total` + stage timings | backend | stage keys follow PR #5: `guardrails`, `classifier`, `retrieval`, `adversarial_review`, `draft_reply`, `verification`. Stages that didn't run are omitted. |
+| `usage.total_tokens` / `usage.estimated_cost_usd` | backend | per-ticket LLM usage |
 
 Rules:
 - New fields can be added. Existing ones can't be renamed or removed without telling the UI owner.
-- If escalated, `draft` can still be sent (as a suggested holding reply) or set to `null`. The UI handles both.
+- **`escalate` usually has `draft: null`.** PR #5 pages the on-call engineer before any LLM call. `human_review` may or may not include a draft (only when there's a close precedent). The UI handles all three.
 - Errors come back as `{ "error": { "code": string, "message": string } }` with a non-200 status.
 
 ### 3.1 Label vocabulary (exact strings)
@@ -64,12 +73,34 @@ The UI shows labels exactly as the hackathon spec names them. Values were checke
 | Field | Values the UI expects | Notes |
 |---|---|---|
 | `classification.type.label` | `Incident` · `Request` · `Problem` · `Change` | Same as the spec. 13,178 dataset rows have no `type`; data owner decides whether to drop them. |
-| `classification.priority.label` | `high` · `medium` · `low` | **The spec uses 3 levels, but the dataset has 5:** `critical` (1,914 rows) and `very_low` (1,783 rows) as well. The backend has to collapse them before training (suggested: `critical → high`, `very_low → low`). The UI only colours these 3 values. Anything else shows as neutral grey text and is never treated as high. |
+| `classification.priority.label` | `high` · `medium` · `low` | The full HF dataset also has `critical` and `very_low`, but only in a separate population of rows with no `type`. Ivy's plan (§2) confirms the 20k file the team uses has only these 3. PR #5 still treats `critical` as high. The UI only colours these 3 values; anything else shows as neutral grey and is never treated as high. |
 | `classification.queue.label` | `Technical Support` · `Product Support` · `Customer Service` · `IT Support` · `Billing and Payments` · `Returns and Exchanges` · `Service Outages and Maintenance` · `Sales and Pre-Sales` · `Human Resources` · `General Inquiry` | The spec gives 6 of these as examples ("e.g."). The dataset has these 10 support queues **plus 42 topic-style queues** such as `Health/Medical Services` and `Games`. Those cover exactly 13,178 rows, the same count as the rows with no `type`, so they are almost certainly a different subset. Data owner decides whether to keep them. The UI prints whatever string it gets and never hard-codes this list, except for the override dropdown (stretch). |
 | `input.language_detected`, `precedents[].language`, `draft.language` | `en` · `de` | Shown as `EN` / `DE`. There is no language picker anywhere (D4). |
-| `escalation.status` | `auto_draft` → **"Auto-Draft Ready"** · `escalate` → **"Escalate to On-Call Engineer"** | The banner text is the spec's exact wording. If the value is missing or unknown, treat it as `escalate` (fail safe). |
-| `escalation.reasons[].code` | `HIGH_PRIORITY_INCIDENT` · `LOW_CONFIDENCE` · `LOW_SIMILARITY` · `UNSUPPORTED_REQUEST` · `PROMPT_INJECTION` | The first four are the spec's §4 gate rules; the last is ours. |
+| `escalation.status` | `auto_draft` → **"Auto-Draft Ready"** (green) · `human_review` → **"Needs Human Review"** (amber) · `escalate` → **"Escalate to On-Call Engineer"** (red) | Green and red use the spec's exact wording; amber is PR #5's middle state. If the value is missing or unknown, treat it as `escalate` (fail safe). |
+| `escalation.reasons[].code` | `HIGH_PRIORITY_INCIDENT` · `CRITICAL_INCIDENT_RISK` · `LOW_CONFIDENCE` · `LOW_MARGIN` · `LOW_SIMILARITY` · `UNSUPPORTED_REQUEST` · `UNSUPPORTED_LANGUAGE` · `PROMPT_INJECTION` · `VERIFICATION_FAILED` · `OTHER` | Best-effort tags, used for icons and the "Why?" checklist only. Always render `message`. |
 | `precedents[].ticket_id` | `TKT-` + 5 digits, e.g. `TKT-01842` | ID format from the spec's split snippet. |
+
+### 3.2 Mapping from PR #5's `TriageResult.to_dict()`
+
+PR #5 has no HTTP endpoint yet. The FastAPI wrapper for `POST /api/triage` calls `create_orchestrator().triage(subject, body)` and converts the result:
+
+| PR #5 field | Contract field |
+|---|---|
+| `status`: `AUTO_DRAFT_READY` / `HUMAN_REVIEW` / `ESCALATE_IMMEDIATELY` | `escalation.status`: `auto_draft` / `human_review` / `escalate` |
+| `reasons[]` (strings) | `escalation.reasons[].message`. `code` comes from the prefix: "High-priority Incident" → `HIGH_PRIORITY_INCIDENT`, "Possible prompt injection" → `PROMPT_INJECTION`, "Unsupported language" → `UNSUPPORTED_LANGUAGE`, "No close historical precedent" → `LOW_SIMILARITY`, an entry from `find_unsupported_requests` → `UNSUPPORTED_REQUEST`, otherwise `OTHER` |
+| `final_labels.{head}.{label,confidence}` | `classification.{head}.{label,confidence}` |
+| `disagreements` | `classification.disagreements` |
+| `route`, `route_reasons` | `route.path`, `route.reasons` |
+| `language` | `input.language_detected`, `draft.language` |
+| `pii_counts`, `injection_signals` | `input.pii_counts`, `guardrails.injection_signals` (first signal → `prompt_injection.evidence`) |
+| `precedents[].{ticket_id,similarity,answer_snippet,labels.*}` | `precedents[]` (flatten `labels`). **Ask Chase to also export `language`, `subject`, `body` and `answer`**: all four are already on the `Precedent` dataclass. |
+| `draft_reply` | `draft.text`; `draft.citations` = `[TKT-…]` matches in the text |
+| `removed_claims`, `verification_issues` | `guardrails.*` of the same name |
+| `latency_ms`, `stage_latency_ms` | `latency_ms.total`, `latency_ms.<stage>` |
+| `total_tokens`, `estimated_cost_usd` | `usage.*` |
+| `TriageConfig.min_head_confidence`, `min_top_similarity` | `escalation.thresholds.confidence` (0.55), `.similarity` (0.45) |
+
+Gap to raise with Chase and Ivy: Ivy's plan outputs `critical_incident_risk` and per-head margins and uses them in the gate. PR #5's `TicketLabels` / `find_mandatory_escalation` has no slot for them yet, so they'd be dropped before reaching the gate or the UI.
 
 ---
 
@@ -133,6 +164,8 @@ On submit, the layout switches to the two panes in A–D. The ticket moves into 
 └───────────────────────────────┴───────────────────────────────────────────────────────────┘
 ```
 
+With PR #5's pipeline, `escalate` comes back with `draft: null` (on-call is paged before any LLM call). The draft section then shows one line, "No draft: paged on-call before drafting", instead of the holding reply sketched above.
+
 **B. Auto-draft: DE billing question (sample chip 2), results pane only**
 
 ```
@@ -176,6 +209,20 @@ On submit, the layout switches to the two panes in A–D. The ticket moves into 
 ```
 In the input pane, the same evidence string is highlighted inside the body text.
 
+**E. Needs Human Review: PR #5's middle state (low confidence, agents disagree, unsupported request, unsupported language, verifier removed claims)**
+
+```
+│▌NEEDS HUMAN REVIEW                                                          (amber, not red)│
+│▌Agents disagree on queue · route: deep · EN · 3.80 s                              Why? ▾    │
+├─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ DRAFT · for human review · EN                                     [Copy as internal note]   │
+│ Thank you for your message. In a similar case [TKT-22548] …                                 │
+│ Removed by verifier (unsupported): "We will refund 50 € within 24 hours."                   │
+```
+
+Under PR #5, the situations in wireframes C (no precedent) and D (prompt injection, unsupported request) come back as `human_review`, so they use this amber banner rather than red. Red is reserved for high-priority Incidents.
+
+
 What changed from the first wireframe, and why:
 
 | Tweak | Source | Behaviour | Contract fields |
@@ -184,10 +231,10 @@ What changed from the first wireframe, and why:
 | **Confidence band label** | Zendesk | Each bar has a threshold tick (`│`) and a word next to the number: `Low` < gate threshold (amber), `Medium` up to 0.85, `High` ≥ 0.85. All three rows look identical (C4, E3). | `classification.*.confidence`, `escalation.thresholds.confidence` |
 | **"Why?" checklist** | Linear | Collapsed by default when the result is auto-draft, open by default when escalated. It lists all five gate checks with pass/fail and the value that decided each one. The UI works these out from the response, so the backend only has to send the thresholds. | `classification.*`, `precedents[0].similarity`, `guardrails.*`, `escalation.thresholds` |
 | **Escalation you can act on** | PagerDuty | The banner names the queue being paged and has a secondary **Acknowledge** button. Clicking it changes the banner to "Acknowledged by operator · 10:42" (UI-only state). Triage stays the only primary button (D1). | `classification.queue.label` |
-| **Draft label and action follow the gate** | Intercom ("Add as a note") | Auto-draft: "Copy draft". Escalated: the header says "holding reply for engineer review" and the button is "Copy as internal note". If `draft` is `null`, show one line saying why. | `escalation.status`, `draft` |
+| **Draft label and action follow the gate** | Intercom ("Add as a note") | `auto_draft`: "Copy draft". `human_review` with a draft: header "draft for human review", button "Copy as internal note". `escalate` (normally `draft: null`): one line, "No draft: paged on-call before drafting". If `removed_claims` is non-empty, list them under the draft as "Removed by verifier (unsupported): …". | `escalation.status`, `draft`, `guardrails.removed_claims` |
 | **"Knowledge gap" wording** | Plain | A `LOW_SIMILARITY` escalation reads as "No precedent: knowledge gap", using the spec's own idea of "no historical precedent". | `escalation.reasons[].code` |
 | **"Likely duplicate" tag** | Linear | Added to a precedent row when similarity ≥ 0.90. Colourless text tag, so B1 still holds. | `precedents[].similarity` |
-| **Compact precedent rows** | Linear | One line each: ID (monospace), similarity, language, type · priority, subject. Expand to see the answer snippet. **The top precedent and any cited precedent start expanded**, so the spec's "historical answer snippet" is visible without a click. At most 5 (C1). | `precedents[]` |
+| **Expandable precedents with full evidence** | Linear, Intercom | Collapsed: one line with ID (monospace), similarity, language, type · priority, subject and a one-line resolution preview. Expanded: **Original ticket** (subject + full `body`, clipped to about 6 lines with "Show more"), **Resolution** (full `answer`, the most room, since the draft is grounded in it) and a small label row. **One row open at a time.** Nothing starts expanded except when a `[TKT-…]` citation is clicked, which opens and scrolls to that row. Long text scrolls inside the row. Falls back to `answer_snippet` when `answer` is missing. At most 5 (C1). | `precedents[]` |
 | **Major-incident banner** (stretch) | Plain | A strip across the whole app above both panes when several recent tickets cluster together. Outline style, never filled: the escalation banner must stay the only saturated element (B1). | needs a new field; raise it as a contract gap when building |
 | **Override prediction** (stretch) | Zendesk, Linear | The label text becomes a dropdown (queue list from §3.1). Changing it re-runs the gate checks client-side and marks the row "edited". Build last, because it adds controls to the main flow (D1). | — |
 
@@ -272,8 +319,9 @@ Checks on every run:
 ## 8. Open decisions (owner to confirm)
 
 1. Final stack: React+FastAPI (recommended) vs Streamlit fallback.
-2. Gate thresholds (confidence, similarity). **Proposed:** `escalation.thresholds` was added to the example contract (an additive change) so the UI can draw threshold ticks and the "Why?" checklist. Backend owners: confirm the real values (0.60 / 0.55 are placeholders).
-3. Whether the draft is shown when a ticket is escalated. **Proposed in §4.1:** show it as a "holding reply for engineer review" with "Copy as internal note"; if the backend sends `draft: null`, show one line explaining why.
+2. Gate thresholds: now taken from PR #5's `TriageConfig` (confidence 0.55, similarity 0.45) and echoed in `escalation.thresholds`. Ivy's tuned values replace them once the classifier is trained.
+3. Draft on escalation: settled by PR #5. `escalate` has no draft (paged before any LLM call); `human_review` may have one (see the §4.1 tweaks table).
 4. Whether the feedback reactions (§4.4) are in scope at all.
-5. Label cleanup (§3.1): data owner confirms `critical → high`, `very_low → low`, and whether the 13,178 rows with no type and topic-style queues are dropped.
+5. Ivy + Chase: get `critical_incident_risk` and margins through PR #5's classifier interface into the gate (§3.2). Chase: export precedent `language`, `subject`, `body` and `answer` in `to_dict()`.
 6. Leakage check: `scripts/prepare_data.py` numbers tickets by source row **before** the seeded shuffle, so knowledge-base and holdout IDs are interleaved. No ID range separates them. Check precedent IDs against the ID list in `data/prepared/holdout_inputs.csv`; the backend can echo a `leak` flag if a precedent appears in it.
+7. Someone owns the FastAPI wrapper (§3.2). It's about 80 lines and can't start until PR #5 is merged.

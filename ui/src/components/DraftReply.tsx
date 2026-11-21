@@ -16,27 +16,37 @@ export function DraftReply({
   onCite: (id: string) => void;
   onHover: (id: string | null) => void;
 }) {
-  const escalated = normalizeStatus(res.escalation?.status) === "escalate";
+  const status = normalizeStatus(res.escalation?.status);
+  const escalated = status === "escalate";
+  const internal = status !== "auto_draft"; // human_review / escalate drafts are internal notes
   const draft = res.draft;
   const byId = new Map(res.precedents.map((p) => [p.ticket_id, p]));
+  const removed = res.guardrails?.removed_claims ?? [];
 
   if (!draft) {
     const gap = res.escalation?.reasons?.some((r) => r.code === "LOW_SIMILARITY");
     return (
       <Section label="Draft" meta="not generated">
         <p className="px-5 py-4 text-[14.5px] text-ink-2">
-          Not generated:{" "}
-          {gap ? "there is no past resolution to ground a reply in." : escalated ? "held for engineer review." : "the generator returned no draft."}
+          {escalated
+            ? "No draft: paged on-call before drafting"
+            : gap
+              ? "No draft: there is no past resolution to ground a reply in."
+              : status === "human_review"
+                ? "No draft: held for human review."
+                : "No draft: the generator returned none."}
         </p>
+        <RemovedClaims claims={removed} />
       </Section>
     );
   }
 
+  const header = escalated ? "holding reply for engineer review" : status === "human_review" ? "for human review" : null;
   const copy = async () => {
-    const text = escalated ? `[Internal note · holding reply for engineer review]\n\n${draft.text}` : draft.text;
+    const text = internal ? `[Internal note · ${header}]\n\n${draft.text}` : draft.text;
     try {
       await navigator.clipboard.writeText(text);
-      toast(escalated ? "Copied as internal note" : "Draft copied");
+      toast(internal ? "Copied as internal note" : "Draft copied");
     } catch {
       toast("Copy failed: clipboard not available");
     }
@@ -49,7 +59,7 @@ export function DraftReply({
     <Section
       label={
         <>
-          Draft{escalated && <span> · holding reply for engineer review</span>} · {langCode(draft.language)}
+          Draft{header && <span> · {header}</span>} · {langCode(draft.language)}
         </>
       }
       meta={`${cited.length} citation${cited.length === 1 ? "" : "s"}`}
@@ -57,6 +67,7 @@ export function DraftReply({
       <div className="px-5 pt-4 pb-4">
         <p className="max-w-[86ch] text-[15px] leading-[1.75] text-ink">{renderWithCitations(draft.text, byId, onCite, onHover)}</p>
       </div>
+      <RemovedClaims claims={removed} />
       <div className="flex items-center gap-3 border-t border-line px-5 py-2.5">
         <p className={`text-[12.5px] ${res.guardrails?.citations_valid === false ? "font-medium text-amber" : "text-ink-3"}`}>
           {res.guardrails?.citations_valid === false
@@ -69,10 +80,27 @@ export function DraftReply({
           className="ml-auto flex h-8 items-center gap-2 rounded-md border border-field bg-surface px-3 text-[13px] font-medium text-ink hover:border-ink-2"
         >
           <IconCopy />
-          {escalated ? "Copy as internal note" : "Copy draft"}
+          {internal ? "Copy as internal note" : "Copy draft"}
         </button>
       </div>
     </Section>
+  );
+}
+
+/** Sentences the verifier deleted (unsupported promises): visible proof against hallucination. */
+function RemovedClaims({ claims }: { claims: string[] }) {
+  if (!claims.length) return null;
+  return (
+    <div className="border-t border-line px-5 py-3">
+      <p className="text-[12.5px] font-medium text-ink-2">Removed by verifier (unsupported):</p>
+      <ul className="mt-1 space-y-1">
+        {claims.map((c, i) => (
+          <li key={i} className="text-[13.5px] text-ink-3 line-through decoration-ink-3/70">
+            “{c}”
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -144,10 +172,10 @@ function CitationChip({
               <span className="num flex justify-between text-[12px] text-ink-3">
                 <span>{p.ticket_id}</span>
                 <span>
-                  {fmtScore(p.similarity)} sim · {langCode(p.language)}
+                  {fmtScore(p.similarity)} sim{p.language ? ` · ${langCode(p.language)}` : ""}
                 </span>
               </span>
-              <span className="mt-1 block font-medium text-ink">{p.subject}</span>
+              {p.subject && <span className="mt-1 block font-medium text-ink">{p.subject}</span>}
               <span className="mt-1 line-clamp-2 block text-ink-2">{p.answer_snippet}</span>
               <span className="mt-2 block text-[12px] text-ink-3">Click to jump to precedent</span>
             </>

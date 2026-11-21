@@ -30,6 +30,9 @@
   --ok: #18804a;
   --ok-tint: #ecf6f0;
   --ok-text: #11613a;
+  --rev: #c98500;
+  --rev-tint: #fcf4e1;
+  --rev-text: #7a4f00;
 
   /* Muted tones used elsewhere (never the banner's full-strength colour) */
   --tone-high: #9f3d35;
@@ -66,6 +69,9 @@
   --ok: #2fae66;
   --ok-tint: #10231a;
   --ok-text: #86dcaa;
+  --rev: #e0a526;
+  --rev-tint: #2a2110;
+  --rev-text: #f4c96e;
 
   --tone-high: #e3968e;
   --tone-medium: #d8b36a;
@@ -102,6 +108,9 @@
   --color-ok: var(--ok);
   --color-ok-tint: var(--ok-tint);
   --color-ok-text: var(--ok-text);
+  --color-rev: var(--rev);
+  --color-rev-tint: var(--rev-tint);
+  --color-rev-text: var(--rev-text);
   --color-tone-high: var(--tone-high);
   --color-tone-medium: var(--tone-medium);
   --color-tone-low: var(--tone-low);

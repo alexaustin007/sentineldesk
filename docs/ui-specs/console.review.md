@@ -2,7 +2,7 @@
 
 Graded against UI_WORKFLOW §1, §3.1, §4.1 (wireframes A–D and the tweaks table) and §5, and every Check in UX_RULES. There is no planner spec (`console.md`). Each item below was checked in Chrome (DevTools MCP, true 1440 px viewport) against the mock dev server on :5173. Claims in `console.build.md` were re-tested, not assumed.
 
-Screenshots were taken locally during review and are not committed; file names below are for reference.
+Screenshots were taken locally and are not committed.
 
 ## Loop 1
 

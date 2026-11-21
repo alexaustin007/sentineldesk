@@ -1,38 +1,44 @@
 import { useEffect, useState } from "react";
-import { fmtMs, fmtSeconds } from "../lib/labels";
+import { fmtMs, fmtSeconds, stageName } from "../lib/labels";
 import type { RunState } from "../lib/run";
 import { PIPELINE_STAGES, type PipelineStage } from "../types/triage";
 import { IconCheck, IconSpinner } from "./Icons";
 
-type StepStatus = "pending" | "active" | "done" | "stopped" | "skipped";
+type StepStatus = "pending" | "active" | "done" | "stopped";
+interface Step {
+  key: string;
+  st: StepStatus;
+}
 
-// The API returns timings only at the end, so while waiting the list advances on a
-// plausible schedule (classify/retrieve are fast) and sits on "generate" until the response lands.
-const ESTIMATE_DONE_AT: Partial<Record<PipelineStage, number>> = { classify: 250, retrieve: 700 };
+// While waiting we don't know the route yet, so show the stages every routed ticket runs
+// (adversarial review only appears in the result when the deep route ran).
+const LOADING_STAGES: PipelineStage[] = ["guardrails", "classifier", "retrieval", "draft_reply", "verification"];
+// The API returns timings only at the end, so the list advances on a plausible schedule
+// (guardrails/classifier/retrieval are fast) and sits on "draft reply" until the response lands.
+const ESTIMATE_DONE_AT: Partial<Record<PipelineStage, number>> = { guardrails: 80, classifier: 200, retrieval: 600 };
 
-function stepsFor(run: RunState, elapsed: number): Record<PipelineStage, StepStatus> {
-  const out = {} as Record<PipelineStage, StepStatus>;
-  if (run.kind === "idle") {
-    PIPELINE_STAGES.forEach((s) => (out[s] = "pending"));
-    return out;
-  }
+function stepsFor(run: RunState, elapsed: number): Step[] {
   if (run.kind === "success") {
-    PIPELINE_STAGES.forEach((s) => (out[s] = run.res.latency_ms[s] == null ? "skipped" : "done"));
-    return out;
+    // Only stages present in latency_ms, canonical order first, then any unknown keys.
+    const keys = Object.keys(run.res.latency_ms).filter((k) => k !== "total" && run.res.latency_ms[k] != null);
+    const known = PIPELINE_STAGES.filter((s) => keys.includes(s));
+    const extra = keys.filter((k) => !(PIPELINE_STAGES as readonly string[]).includes(k));
+    return [...known, ...extra].map((key) => ({ key, st: "done" }));
   }
+  if (run.kind === "idle") return LOADING_STAGES.map((key) => ({ key, st: "pending" }));
   const at = run.kind === "loading" ? elapsed : run.elapsedMs;
   let activeSet = false;
-  for (const s of PIPELINE_STAGES) {
-    const doneAt = ESTIMATE_DONE_AT[s];
-    if (doneAt != null && at >= doneAt) out[s] = "done";
-    else if (!activeSet) {
+  return LOADING_STAGES.map((key) => {
+    const doneAt = ESTIMATE_DONE_AT[key];
+    if (doneAt != null && at >= doneAt) return { key, st: "done" };
+    if (!activeSet) {
+      activeSet = true;
       // On failure we don't know which stage broke (the backend doesn't say), so the
       // step that was in progress is marked "stopped", not "failed" (review #8).
-      out[s] = run.kind === "loading" ? "active" : "stopped";
-      activeSet = true;
-    } else out[s] = "pending";
-  }
-  return out;
+      return { key, st: run.kind === "loading" ? "active" : "stopped" };
+    }
+    return { key, st: "pending" };
+  });
 }
 
 function Marker({ st }: { st: StepStatus }) {
@@ -55,7 +61,6 @@ function Marker({ st }: { st: StepStatus }) {
         <span className="h-2 w-2 rounded-[1px] bg-tone-high" />
       </span>
     );
-  if (st === "skipped") return <span className={`${ring} border-dashed border-ink-4 bg-surface`} />;
   return <span className={`${ring} border-ink-4 bg-surface`} />;
 }
 
@@ -70,6 +75,9 @@ export function Pipeline({ run }: { run: RunState }) {
   const elapsed = run.kind === "loading" ? Math.max(0, now - run.startedAt) : 0;
   const steps = stepsFor(run, elapsed);
   const total = run.kind === "success" ? run.res.latency_ms.total : null;
+  const path = run.kind === "success" ? run.res.route?.path : undefined;
+  const route = path === "fast" || path === "deep" ? path : null;
+  const routeReasons = run.kind === "success" ? run.res.route?.reasons?.join(" · ") : undefined;
 
   const [totalNote, totalText] =
     run.kind === "success"
@@ -85,18 +93,24 @@ export function Pipeline({ run }: { run: RunState }) {
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="label">Pipeline</h2>
+        <span className="flex items-baseline gap-2">
+          <h2 className="label">Pipeline</h2>
+          {route && (
+            <span className="num rounded-[3px] border border-field px-1.5 py-px text-[11px] text-ink-2" title={routeReasons}>
+              route: {route}
+            </span>
+          )}
+        </span>
         <span className="flex items-baseline gap-2">
           {totalNote && <span className={`text-[12px] ${run.kind === "loading" ? "text-ink-3" : "text-tone-high"}`}>{totalNote}</span>}
           <span className="num text-[18px] font-medium text-ink">{totalText}</span>
         </span>
       </div>
       <ol className="relative">
-        {PIPELINE_STAGES.map((s, i) => {
-          const st = steps[s];
+        {steps.map(({ key: s, st }, i) => {
           const ms = run.kind === "success" ? run.res.latency_ms[s] : undefined;
           const share = total && ms != null ? Math.max(2, (ms / total) * 100) : 0;
-          const last = i === PIPELINE_STAGES.length - 1;
+          const last = i === steps.length - 1;
           return (
             <li key={s} className="relative grid grid-cols-[20px_minmax(0,1fr)] gap-x-3 pb-3 last:pb-0">
               {!last && (
@@ -108,9 +122,9 @@ export function Pipeline({ run }: { run: RunState }) {
               <Marker st={st} />
               <div className="min-w-0">
                 <div className="flex h-5 items-center justify-between gap-2 text-[13px]">
-                  <span className={st === "pending" || st === "skipped" ? "text-ink-3" : "font-medium text-ink"}>{s}</span>
+                  <span className={st === "pending" ? "text-ink-3" : "font-medium text-ink"}>{stageName(s)}</span>
                   <span className={`num text-[12.5px] ${st === "stopped" ? "text-tone-high" : "text-ink-2"}`}>
-                    {ms != null ? fmtMs(ms) : st === "skipped" ? "skipped" : st === "stopped" ? "stopped" : st === "active" ? "…" : ""}
+                    {ms != null ? fmtMs(ms) : st === "stopped" ? "stopped" : st === "active" ? "…" : ""}
                   </span>
                 </div>
                 <div className="mt-1.5 h-1 rounded-full bg-bar-track">

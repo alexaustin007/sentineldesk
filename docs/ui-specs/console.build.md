@@ -55,7 +55,7 @@ Stack: Vite 6, React 18, TypeScript 5.8 (strict), Tailwind v4 (`@tailwindcss/vit
 - [x] Panes stack below 1024 px with no horizontal scroll.
 - [x] One primary button, 4 chips, no language picker, no "AI" styling. The banner is the only saturated fill (B1).
 
-Screenshots (1440 px) were taken locally and are not committed: `ui-A-escalated-vpn-light.png`, `ui-B-autodraft-de-light.png`, `ui-C-knowledge-gap-light.png`, `ui-D-guardrail-injection-light.png`, `ui-timeout-light.png`, `ui-console-A-escalated-dark-acknowledged.png`.
+Screenshots were taken locally and are not committed.
 
 ## Contract gaps (for backend owners; contract not edited)
 
@@ -137,3 +137,69 @@ Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements
 | Note: one timeout run ended early with "signal is aborted without reason" | A request we cancelled ourselves (New ticket, unmount or hot reload) is now ignored instead of shown as an error. |
 
 The loop-2 review found no blockers, and the 4 loop-1 majors are confirmed fixed. Per the team, there is no further review loop. Minors are left as listed in `console.review.md`.
+
+## Revised contract (PR #5 + Ivy's classifier plan)
+
+The UI now follows the revised `contracts/triage_response.example.json` and UI_WORKFLOW §3–§3.2 and §4.1 wireframe E.
+
+- **Types** (`ui/src/types/triage.ts`):
+  - `escalation.status` is `auto_draft | human_review | escalate`.
+  - `input.language_supported` and `input.pii_counts` replace `pii_masked`.
+  - New: `classification.{head}.margin?`, `classification.critical_incident_risk`, `classification.disagreements`, `escalation.thresholds.critical_incident_risk`, `route`, `guardrails.injection_signals`, `removed_claims`, `verification_issues`, `usage`.
+  - Optional: `reasons[].code`, `precedents[].language` and `.subject`.
+  - `latency_ms` has free-form stage keys.
+  - The contract example still typechecks via `/dev/states#contract`.
+- **Banner:** three states, each the only saturated colour while shown (B1):
+  - green "Auto-Draft Ready"
+  - amber "Needs Human Review" (new `--rev` tokens: text 6.5:1 light, 10:1 dark)
+  - red "Escalate to On-Call Engineer"
+
+  A missing or unknown status still renders as red escalate.
+- **Reasons:** each `message` is rendered verbatim, one per line. A known `code` adds a small tag (e.g. `knowledge gap`, `injection`). `OTHER`, unknown or missing codes get no tag (`#unknown-code`, `#e`).
+- **Banner meta line:** lang (plus "(unsupported)" if `language_supported: false`), route (fast/deep), end-to-end latency, and `usage.estimated_cost_usd` as `$0.0004`, hidden when 0.
+- **Why? checklist:**
+  - Uses `thresholds` (0.55 / 0.45). The default fallback is now 0.55 / 0.45 too.
+  - Conditional rows: "critical incident risk < T" (only when the risk isn't null), "classifier vs precedents disagree on: queue" (only when `disagreements` is non-empty), "supported language" (only when it failed) and "verifier found no unsupported claims" (only with removed claims, issues or `VERIFICATION_FAILED`).
+  - A margin note sits on the confidence row, and `LOW_MARGIN` fails that row.
+  - Open by default for `human_review` and `escalate`.
+- **Draft:**
+  - `escalate` + `null` shows "No draft: paged on-call before drafting".
+  - `human_review` with a draft gets the header "for human review" and "Copy as internal note".
+  - `removed_claims` is listed under the draft as "Removed by verifier (unsupported): …", struck through and muted, and also shows when there is no draft.
+- **Pipeline:** PR #5 stage names in order (guardrails → classifier → retrieval → adversarial review → draft reply → verification). Only stages present in `latency_ms` are shown, and unknown keys are appended. While loading it shows the five stages every routed ticket runs. A `route: fast/deep` tag sits next to the label, with the route reasons as a tooltip.
+- **Precedents:** when `subject` is missing, the meta line (type · priority · queue) moves up, so there's no blank line. When `language` is missing it is dropped from the meta line and the citation popover.
+- **Mocks:**
+  - VPN outage → `escalate`, `draft: null`, route `none`
+  - German billing → `auto_draft`, route `fast`, $0.0004
+  - No subject (knowledge gap) and Injection attempt → `human_review`
+  - New `humanReviewDeep.ts` (wireframe E) → `human_review` with a draft, route `deep`, disagreement on queue, one removed claim, one reason without a code, and one precedent without language/subject. It is only on `/dev/states#e`, because a fifth link would break the one line and D1's limit of 4.
+
+  All precedent IDs are still below `TKT-49412`.
+- **Verified:** typecheck and build pass. Checked at 1440 px: `#e` in light (banner, Why rows, draft with removed claim, precedent without subject) and the VPN example on `/` in dark (red, no draft, 3 pipeline stages, cost hidden). Screenshots are in the shared notes folder with the `v4-` prefix. No review loop, per the team.
+- **Contract gap carried over from §3.2:** `critical_incident_risk` and margins may not reach the UI until PR #5's `TicketLabels` has slots for them. The UI hides those rows when they're null or absent.
+
+## Expandable precedents with full evidence (team request)
+
+Follows UI_WORKFLOW §4.1, tweaks row "Expandable precedents with full evidence", and the new optional `precedents[].body` / `.answer`.
+
+- **Collapsed (default, nothing starts open):** ID + similarity on the left.
+  - Line 1: subject, then lang · type · priority.
+  - Line 2: a one-line resolution preview (`answer`, else `answer_snippet`) with the `cited` / `Likely duplicate` tags.
+- **Expanded:**
+  - **Original ticket:** subject and full `body`, clipped to 6 lines, with "Show more"/"Show less" when it overflows.
+  - **Resolution:** full `answer`, the largest text in the panel.
+  - **Label row:** type, queue, priority, language, similarity.
+  - The panel is `max-h-[440px]` and scrolls internally, so the page doesn't jump.
+- **One row open at a time.** Clicking a `[TKT-…]` citation opens that row, closes any other, scrolls to it and flashes it. The row header is a `<button>` with `aria-expanded` / `aria-controls`, so Enter and Space toggle it.
+- **Fallbacks:**
+  - no `answer` → `answer_snippet`
+  - no `body` → no "Original ticket" block
+  - missing `subject` / `language` → those cells drop out (the meta line takes line 1)
+- **Mocks:** `body` and `answer` added to every precedent except TKT-09385 (`/dev/states#c`) and TKT-36002 (`#e`, which also lacks subject/language). TKT-01842's body is a pasted email long enough to show "Show more" (`#a`).
+- **Verified at 1440 px light:**
+  - German billing on `/`: nothing open at first.
+  - `[TKT-40766]` opens only that row and flashes it; `[TKT-12093]` then switches to it.
+  - `#a`: Show more → Show less.
+  - `#c` and `#e`: the fallbacks.
+
+  Typecheck and build pass. Screenshots have the `v5-` prefix. No review loop.

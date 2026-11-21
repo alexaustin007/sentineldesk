@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import contractExample from "../../../contracts/triage_response.example.json";
 import { ConsoleView } from "../components/ConsoleView";
 import { EntryView } from "../components/EntryView";
-import { deBilling, injection, knowledgeGap, lowConfidence, vpnOutage } from "../mocks";
+import { deBilling, humanReviewDeep, injection, knowledgeGap, lowConfidence, vpnOutage } from "../mocks";
 import type { RunState } from "../lib/run";
 import type { TriageResponse } from "../types/triage";
 
@@ -36,10 +36,34 @@ const CASES: Case[] = [
     input: vpnOutage.input,
   },
   { id: "timeout", title: "Timeout > 30 s · retry", run: { kind: "timeout", elapsedMs: 30000 }, input: vpnOutage.input },
-  { id: "a", title: "A · Escalated · VPN outage (chip 1)", run: success(vpnOutage) },
-  { id: "b", title: "B · Auto-draft · DE billing (chip 2)", run: success(deBilling) },
-  { id: "c", title: "C · Knowledge gap · no subject (chip 4)", run: success(knowledgeGap) },
-  { id: "d", title: "D · Guardrail hit · injection (chip 3)", run: success(injection) },
+  { id: "a", title: "A · Escalate (red) · VPN outage, draft: null", run: success(vpnOutage) },
+  { id: "b", title: "B · Auto-draft (green) · German billing", run: success(deBilling) },
+  { id: "c", title: "C · Human review (amber) · knowledge gap · no subject", run: success(knowledgeGap) },
+  { id: "d", title: "D · Human review (amber) · injection attempt", run: success(injection) },
+  {
+    id: "e",
+    title: "E · Human review (amber) · deep route · queue disagreement · removed claim · reason without code · precedent without lang/subject",
+    run: success(humanReviewDeep),
+  },
+  {
+    id: "unknown-code",
+    title: "Unknown reason code + OTHER render verbatim",
+    run: success(
+      edge(
+        {
+          escalation: {
+            status: "human_review",
+            reasons: [
+              { code: "SOMETHING_NEW", message: "A rule the UI has never heard of fired" },
+              { code: "OTHER", message: "Free-text reason from the gate" },
+            ],
+            thresholds: deBilling.escalation.thresholds,
+          },
+        },
+        deBilling,
+      ),
+    ),
+  },
   {
     id: "low",
     title: "Low confidence · unknown priority “critical” · missing status → escalate · invalid citation",
