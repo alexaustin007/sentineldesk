@@ -272,10 +272,12 @@ Stacking trains a "meta-learner" that learns **when to trust which model**:
 ```python
 from sklearn.pipeline import Pipeline
 
-svm_pipeline = Pipeline([
-    ('tfidf', TfidfVectorizer(...)),
-    ('clf', CalibratedClassifierCV(LinearSVC(max_iter=10000), cv=5)),
-])
+svm_pipeline = Pipeline(
+    [
+        ("tfidf", TfidfVectorizer(...)),
+        ("clf", CalibratedClassifierCV(LinearSVC(max_iter=10000), cv=5)),
+    ]
+)
 ```
 
 This ensures that for every fold, the vectorizer is fit only on that fold's training partition.
@@ -451,29 +453,53 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import ComplementNB
 from sklearn.calibration import CalibratedClassifierCV
 
-svm_pipe = Pipeline([
-    ('tfidf', TfidfVectorizer(
-        ngram_range=(1, 2), sublinear_tf=True, max_features=50000,
-        analyzer='word', min_df=2,
-    )),
-    ('clf', CalibratedClassifierCV(LinearSVC(max_iter=10000), cv=5)),
-])
+svm_pipe = Pipeline(
+    [
+        (
+            "tfidf",
+            TfidfVectorizer(
+                ngram_range=(1, 2),
+                sublinear_tf=True,
+                max_features=50000,
+                analyzer="word",
+                min_df=2,
+            ),
+        ),
+        ("clf", CalibratedClassifierCV(LinearSVC(max_iter=10000), cv=5)),
+    ]
+)
 
-lr_pipe = Pipeline([
-    ('tfidf', TfidfVectorizer(
-        ngram_range=(1, 2), sublinear_tf=True, max_features=50000,
-        analyzer='word', min_df=2,
-    )),
-    ('clf', LogisticRegression(max_iter=1000, solver='saga')),
-])
+lr_pipe = Pipeline(
+    [
+        (
+            "tfidf",
+            TfidfVectorizer(
+                ngram_range=(1, 2),
+                sublinear_tf=True,
+                max_features=50000,
+                analyzer="word",
+                min_df=2,
+            ),
+        ),
+        ("clf", LogisticRegression(max_iter=1000, solver="saga")),
+    ]
+)
 
-cnb_pipe = Pipeline([
-    ('tfidf', TfidfVectorizer(
-        ngram_range=(1, 2), sublinear_tf=True, max_features=50000,
-        analyzer='word', min_df=2,
-    )),
-    ('clf', ComplementNB(alpha=1.0)),
-])
+cnb_pipe = Pipeline(
+    [
+        (
+            "tfidf",
+            TfidfVectorizer(
+                ngram_range=(1, 2),
+                sublinear_tf=True,
+                max_features=50000,
+                analyzer="word",
+                min_df=2,
+            ),
+        ),
+        ("clf", ComplementNB(alpha=1.0)),
+    ]
+)
 ```
 
 If stacking is adopted, `StackingClassifier` wraps these pipelines:
@@ -482,10 +508,10 @@ If stacking is adopted, `StackingClassifier` wraps these pipelines:
 from sklearn.ensemble import StackingClassifier
 
 stacking_clf = StackingClassifier(
-    estimators=[('svm', svm_pipe), ('lr', lr_pipe), ('cnb', cnb_pipe)],
+    estimators=[("svm", svm_pipe), ("lr", lr_pipe), ("cnb", cnb_pipe)],
     final_estimator=LogisticRegression(max_iter=1000),
     cv=5,
-    stack_method='predict_proba',
+    stack_method="predict_proba",
     passthrough=False,
 )
 ```
