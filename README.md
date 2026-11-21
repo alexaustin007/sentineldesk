@@ -21,3 +21,18 @@ Keep the downloaded CSV local and commit code and instructions to GitHub.
 - Pass only the subject and body to the app during holdout evaluation. Use holdout labels only for scoring, and keep holdout answers out of training, the retrieval index, and model prompts.
 
 [Organizer’s brief and evaluation rules](https://docs.google.com/document/u/0/d/1KeZWHjmfjx00pQIGDGHroOCecdvJzpkU/mobilebasic?pli=1)
+
+## Contributing
+
+Read [AGENTS.md](AGENTS.md) before editing. If you use a coding agent, point it to that file when you start work. The guide covers Python style, how to organize code, and the rules for working with the dataset.
+
+Install Ruff in your development environment and run these commands from the repository root.
+
+```bash
+python -m pip install ruff==0.17.6
+ruff format .
+ruff check .
+ruff format --check .
+```
+
+Ruff uses four spaces per indentation level. Open a pull request against `main` and describe how you verified the change. The **Python quality** workflow runs lint and format checks on pull requests and on pushes to `main`.
