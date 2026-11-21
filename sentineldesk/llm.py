@@ -30,6 +30,9 @@ class ModelSettings:
     model_name: str
     input_price_per_million: float
     output_price_per_million: float
+    # Gemini thinking level ("minimal", "low", "medium", "high"); None keeps the
+    # model's default. Lower levels answer much faster.
+    thinking_level: str | None = None
 
     def estimate_cost(self, input_tokens: int, output_tokens: int) -> float:
         return (
@@ -62,6 +65,8 @@ def load_model_settings() -> dict[str, ModelSettings]:
             output_price_per_million=float(
                 os.getenv("SENTINEL_DEEP_OUTPUT_PRICE", "3.75")
             ),
+            # Default thinking took 16-27 s per ticket; the console times out at 30 s.
+            thinking_level=os.getenv("SENTINEL_DEEP_THINKING_LEVEL", "low") or None,
         ),
     }
 
@@ -136,6 +141,11 @@ class GeminiProvider:
             system_instruction=request.system_prompt,
             response_mime_type="application/json" if request.response_schema else None,
             response_schema=request.response_schema,
+            thinking_config=(
+                types.ThinkingConfig(thinking_level=settings.thinking_level.upper())
+                if settings.thinking_level
+                else None
+            ),
         )
         contents: list[types.Part | str] = [
             types.Part.from_bytes(data=attachment.data, mime_type=attachment.mime_type)

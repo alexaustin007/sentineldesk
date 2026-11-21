@@ -107,6 +107,26 @@ python -m sentineldesk.check_llm
 
 Keep API keys in your shell or an untracked `.env` file. Tune the thresholds in `TriageConfig` on a validation slice of the historical split, never on the holdout.
 
+### Run the console against the real backend
+
+Start the API on port 8000. The console's dev server forwards `/api` to it.
+
+```bash
+.venv/bin/uvicorn api.main:app --port 8000
+```
+
+Point the console at the live API instead of its mock data, then start it on port 5173:
+
+```bash
+printf 'VITE_USE_MOCK=false\n' > ui/.env.development.local
+```
+
+```bash
+npm --prefix ui install && npm --prefix ui run dev
+```
+
+**Hosting (for example Vercel):** the API cannot run as a Vercel function, because the embedding model, index, and classifier are far larger than Vercel's function size limit. Run the API on a machine or service Vercel can reach, then either rewrite `/api/*` to it in Vercel, or call it directly and list the console's origin in `SENTINEL_ALLOWED_ORIGINS` (comma-separated).
+
 ### Integration points
 
 - **Data:** `load_historical_tickets()` in `sentineldesk/data_interface.py` reads `data/prepared/`. It joins the answers in `knowledge_base.csv` with the labels in `train.csv` by ticket ID, and refuses to continue if any ID from `holdout_inputs.csv` would be indexed.
