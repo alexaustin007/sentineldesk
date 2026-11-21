@@ -1,5 +1,5 @@
 # Shared by the classifier features and the RAG engine
-scikit-learn==1.7.2
+scikit-learn==1.9.1
 
 # RAG engine, agent workflow, and guardrails
 faiss-cpu==1.16.0
