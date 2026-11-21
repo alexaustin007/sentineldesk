@@ -69,14 +69,14 @@ export function App() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 h-12 border-b border-line bg-surface">
-        <div className="flex h-full items-center gap-8 px-6">
+        <div className="flex h-full items-center gap-1 px-2 sm:gap-8 sm:px-6">
           <a
             href="/"
             onClick={(e) => {
               e.preventDefault();
               go("/");
             }}
-            className="flex items-center gap-2.5 text-[16px] font-semibold text-ink"
+            className="flex items-center gap-1 text-[14px] sm:gap-2.5 sm:text-[16px] font-semibold text-ink"
           >
             <svg aria-hidden viewBox="0 0 20 20" width="20" height="20" className="text-ink">
               <rect x="1" y="1" width="18" height="18" rx="4" fill="currentColor" />
@@ -94,7 +94,7 @@ export function App() {
                   e.preventDefault();
                   go(t.route);
                 }}
-                className={`-mb-px flex items-center border-b-2 px-3.5 text-[15px] font-medium ${
+                className={`-mb-px flex items-center border-b-2 px-1.5 text-[14px] sm:px-3.5 sm:text-[15px] font-medium ${
                   route === t.route ? "border-accent text-ink" : "border-transparent text-ink-3 hover:text-ink"
                 }`}
               >
@@ -107,9 +107,9 @@ export function App() {
               </span>
             )}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-1 sm:gap-3">
             <span
-              className="flex h-7 items-center gap-1.5 rounded-full bg-surface-2 px-3 text-[13px] text-ink-2"
+              className="flex h-7 items-center gap-1.5 rounded-full bg-surface-2 px-1.5 text-[12px] whitespace-nowrap sm:px-3 sm:text-[13px] text-ink-2"
               title={USE_MOCK ? "VITE_USE_MOCK=true" : "POST /api/triage"}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${USE_MOCK ? "bg-ink-4" : "bg-tone-low"}`} />
