@@ -24,6 +24,14 @@ def make_ticket_features() -> Pipeline:
     return Pipeline(
         [
             ("text", FunctionTransformer(ticket_texts, validate=False)),
-            ("tfidf", TfidfVectorizer(ngram_range=(1, 2))),
+            (
+                "tfidf",
+                TfidfVectorizer(
+                    ngram_range=(1, 2),
+                    sublinear_tf=True,
+                    max_features=50_000,
+                    min_df=2,
+                ),
+            ),
         ]
     )
