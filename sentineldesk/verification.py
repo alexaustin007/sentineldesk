@@ -16,6 +16,10 @@ from sentineldesk.policy_patterns import COMMITMENT_TOPICS, NUMERIC_COMMITMENTS
 from sentineldesk.schemas import Precedent
 
 CITATION_PATTERN = re.compile(r"\[([A-Z][A-Z0-9]*-[A-Za-z0-9-]+)\]")
+# A bracket listing several tickets, such as "[TKT-00001, TKT-00002]".
+_CITATION_GROUP = re.compile(
+    r"\[([A-Z][A-Z0-9]*-[A-Za-z0-9-]+(?:\s*[,;]\s*[A-Z][A-Z0-9]*-[A-Za-z0-9-]+)+)\]"
+)
 _NUMBER_PATTERN = re.compile(r"\d+(?:[.,]\d+)?")
 # Split after . ! ? or a closing citation bracket when the next sentence starts with
 # a capital letter, so "Do X. [TKT-00042] Do Y." keeps each citation with its sentence.
@@ -40,6 +44,7 @@ def verify_reply(
     draft: str, precedents: Sequence[Precedent], expected_language: str
 ) -> VerificationResult:
     """Remove unsupported sentences, then check citations, security, and language."""
+    draft = split_citation_groups(draft)
     evidence_ids = {precedent.ticket_id for precedent in precedents}
     evidence_text = "\n".join(precedent.answer for precedent in precedents)
     issues: list[str] = []
@@ -83,6 +88,16 @@ def verify_reply(
         cleaned_reply=cleaned_reply,
         removed_claims=removed_claims,
         issues=issues,
+    )
+
+
+def split_citation_groups(text: str) -> str:
+    """Rewrite "[TKT-1, TKT-2]" as "[TKT-1] [TKT-2]" so every citation is checkable."""
+    return _CITATION_GROUP.sub(
+        lambda match: " ".join(
+            f"[{ticket_id.strip()}]" for ticket_id in re.split(r"[,;]", match.group(1))
+        ),
+        text,
     )
 
 
