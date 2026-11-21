@@ -57,8 +57,6 @@ def train_and_save() -> dict[str, Pipeline]:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     pipelines: dict[str, Pipeline] = {}
 
-    # Type is well-balanced — no class weighting needed.
-    # Queue and priority need balanced weights to fix minority-class recall.
     target_weights: dict[str, str | None] = {
         "type": None,
         "queue": "balanced",

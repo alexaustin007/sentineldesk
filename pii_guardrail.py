@@ -2,7 +2,6 @@
 
 import re
 
-
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 _PHONE_RE = re.compile(
     r"(?<!\d)"
@@ -17,7 +16,9 @@ _IPV4_RE = re.compile(
 _ACCOUNT_RE = re.compile(r"\b(?:ACCT|ACC|account)[#:\s\-]*\d{4,}\b", re.IGNORECASE)
 _CREDIT_CARD_RE = re.compile(r"\b(?:\d{4}[\s\-]?){3}\d{4}\b")
 _SSN_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-_IBAN_RE = re.compile(r"\b[A-Z]{2}\d{2}[\s]?[\dA-Z]{4}[\s]?(?:[\dA-Z]{4}[\s]?){2,7}[\dA-Z]{1,4}\b")
+_IBAN_RE = re.compile(
+    r"\b[A-Z]{2}\d{2}[\s]?[\dA-Z]{4}[\s]?(?:[\dA-Z]{4}[\s]?){2,7}[\dA-Z]{1,4}\b"
+)
 
 _PATTERNS: list[tuple[re.Pattern, str]] = [
     (_EMAIL_RE, "[EMAIL]"),

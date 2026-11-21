@@ -36,6 +36,103 @@ Use a validation subset of the historical split when tuning models or thresholds
 
 [Organizer’s brief and evaluation rules](https://docs.google.com/document/u/0/d/1KeZWHjmfjx00pQIGDGHroOCecdvJzpkU/mobilebasic?pli=1)
 
+## Triage workflow (RAG and agents)
+
+The `sentineldesk` package holds the retrieval engine and the agent workflow. Each ticket goes through these steps:
+
+1. **Guardrails.** The workflow detects the language (only English and German get automated replies), masks personal data, and screens for prompt injection.
+2. **Agent 1: classifier.** The team's trained model plugs in through `TicketClassifier`.
+3. **Agent 2: precedent vote.** FAISS retrieves similar historical tickets, and they vote on type, queue, and priority, weighted by similarity.
+4. **Mandatory escalation.** Any high-priority Incident goes straight to the on-call engineer, with no LLM call.
+5. **Routing.** When both agents agree with enough confidence, the evidence is strong, and there are no risk cues, Gemini Flash-Lite drafts the reply. Otherwise Gemini Flash first challenges the triage as an adversarial reviewer.
+6. **Verification.** Every draft must cite retrieved tickets. Unsupported promises such as amounts, deadlines, refunds, or guarantees are removed, and any removal or security finding sends the draft to human review.
+
+### Run it
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+```bash
+python -m pytest
+```
+
+After [preparing the local split](#prepare-the-local-split), embed the historical tickets once and save the index to `artifacts/precedent_index` (git ignores it). The multilingual model downloads, about 470 MB, on first use.
+
+```bash
+python -m sentineldesk.build_index
+```
+
+Check how well the precedent vote predicts labels on a validation slice of the historical split. It uses no holdout data.
+
+```bash
+python -m sentineldesk.rag_validation
+```
+
+Run the demo on sample tickets:
+
+```bash
+python -m sentineldesk.demo
+```
+
+Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. It uses the trained classifier from `python classification/classify.py` when its models exist, and a keyword mock otherwise. Without Gemini credentials, it uses a mock LLM.
+
+To run Gemini on Google Cloud credits, sign in once with Application Default Credentials and set the Google Cloud variables listed below:
+
+```bash
+gcloud auth application-default login
+```
+
+Then confirm that both model tiers answer:
+
+```bash
+python -m sentineldesk.check_llm
+```
+
+### Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GOOGLE_GENAI_USE_ENTERPRISE` | not set | Set to `true` to run Gemini on Google Cloud (Vertex AI / Gemini Enterprise Agent Platform) with Application Default Credentials, for Google Cloud credits. |
+| `GOOGLE_CLOUD_PROJECT` | not set | Google Cloud project ID, required in Google Cloud mode |
+| `GOOGLE_CLOUD_LOCATION` | `global` | Google Cloud location for Gemini |
+| `GEMINI_API_KEY` | not set | Gemini Developer API key from Google AI Studio. Without any Gemini credentials the mock LLM runs. |
+| `SENTINEL_LLM_PROVIDER` | `auto` | Set to `enterprise`, `gemini`, or `mock` to force one. |
+| `SENTINEL_FAST_MODEL` | `gemini-3.5-flash-lite` | Routine drafts |
+| `SENTINEL_DEEP_MODEL` | `gemini-3.8-flash` | Adversarial review, complex drafts, attachments |
+| `SENTINEL_FAST_INPUT_PRICE`, `SENTINEL_FAST_OUTPUT_PRICE` | `0.30`, `2.50` | USD per million tokens, used for cost estimates |
+| `SENTINEL_DEEP_INPUT_PRICE`, `SENTINEL_DEEP_OUTPUT_PRICE` | `0.75`, `3.75` | USD per million tokens, used for cost estimates |
+| `SENTINEL_EMBEDDER` | `sentence-transformers` | Set to `tfidf` for offline retrieval |
+| `SENTINEL_EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Multilingual retrieval model |
+
+Keep API keys in your shell or an untracked `.env` file. Tune the thresholds in `TriageConfig` on a validation slice of the historical split, never on the holdout.
+
+### Run the console against the real backend
+
+Start the API on port 8000. The console's dev server forwards `/api` to it.
+
+```bash
+.venv/bin/uvicorn api.main:app --port 8000
+```
+
+Point the console at the live API instead of its mock data, then start it on port 5173:
+
+```bash
+printf 'VITE_USE_MOCK=false\n' > ui/.env.development.local
+```
+
+```bash
+npm --prefix ui install && npm --prefix ui run dev
+```
+
+**Hosting (for example Vercel):** the API cannot run as a Vercel function, because the embedding model, index, and classifier are far larger than Vercel's function size limit. Run the API on a machine or service Vercel can reach, then either rewrite `/api/*` to it in Vercel, or call it directly and list the console's origin in `SENTINEL_ALLOWED_ORIGINS` (comma-separated).
+
+### Integration points
+
+- **Data:** `load_historical_tickets()` in `sentineldesk/data_interface.py` reads `data/prepared/`. It joins the answers in `knowledge_base.csv` with the labels in `train.csv` by ticket ID, and refuses to continue if any ID from `holdout_inputs.csv` would be indexed.
+- **Classifier:** Implement `predict(subject, body) -> TicketLabels`, or wrap three fitted scikit-learn models with `SklearnClassifierAdapter({"type": ..., "queue": ..., "priority": ...})`. The adapter sends `{"subject", "body"}` records, matching `make_ticket_features()`.
+- **UI:** Call `create_orchestrator(classifier=...)` from `sentineldesk.app_factory` once and cache it, for example with `st.cache_resource`. Then call `triage(subject, body)` for each ticket. The returned `TriageResult` has the status, reasons, labels with confidence, precedents, draft, latency, tokens, and cost. `result.to_dict()` gives plain JSON.
+
 ## Contributing
 
 Read [AGENTS.md](AGENTS.md) before editing. If you use a coding agent, point it to that file when you start work. The guide covers Python style, how to organize code, and the rules for working with the dataset.
