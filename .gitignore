@@ -1,0 +1,13 @@
+# Local environments and secrets
+.venv/
+.env
+
+# Organizer dataset and generated artifacts stay local
+data/
+artifacts/
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

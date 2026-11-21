@@ -3,3 +3,7 @@ indent-width = 4
 
 [tool.ruff.format]
 indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
