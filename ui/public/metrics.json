@@ -1,6 +1,6 @@
 {
   "sample": false,
-  "generated_at": "2026-11-21T19:21:04+00:00",
+  "generated_at": "2026-11-21T19:50:36+00:00",
   "model": "Calibrated TF-IDF + LinearSVC classifier blended with a similarity-weighted precedent vote (multilingual MiniLM + FAISS), before the Gemini reviewer",
   "dataset": "dataset-tickets-multi-lang-4-20k.csv",
   "split": {
@@ -12,8 +12,8 @@
   },
   "heads": {
     "type": {
-      "macro_f1": 0.8233,
-      "accuracy": 0.8377,
+      "macro_f1": 0.8321,
+      "accuracy": 0.8445,
       "labels": [
         "Change",
         "Incident",
@@ -23,68 +23,68 @@
       "per_class": [
         {
           "label": "Change",
-          "precision": 0.9835,
-          "recall": 0.9015,
-          "f1": 0.9407,
+          "precision": 0.9733,
+          "recall": 0.9192,
+          "f1": 0.9455,
           "support": 396
         },
         {
           "label": "Incident",
-          "precision": 0.7505,
-          "recall": 0.9233,
-          "f1": 0.828,
+          "precision": 0.7601,
+          "recall": 0.9245,
+          "f1": 0.8343,
           "support": 1590
         },
         {
           "label": "Problem",
-          "precision": 0.7463,
-          "recall": 0.4263,
-          "f1": 0.5427,
+          "precision": 0.7581,
+          "recall": 0.4503,
+          "f1": 0.565,
           "support": 835
         },
         {
           "label": "Request",
-          "precision": 0.9718,
-          "recall": 0.9924,
-          "f1": 0.982,
+          "precision": 0.9766,
+          "recall": 0.9907,
+          "f1": 0.9836,
           "support": 1179
         }
       ],
       "confusion": [
         [
-          357,
-          8,
+          364,
+          7,
           0,
-          31
+          25
         ],
         [
           0,
-          1468,
-          119,
-          3
+          1470,
+          118,
+          2
         ],
         [
-          1,
-          478,
-          356,
-          0
+          3,
+          455,
+          376,
+          1
         ],
         [
-          5,
+          7,
           2,
           2,
-          1170
+          1168
         ]
       ],
-      "calibration_error": 0.0518,
+      "calibration_error": 0.0604,
       "macro_f1_by_language": {
-        "de": 0.7934,
-        "en": 0.8438
+        "de": 0.8112,
+        "en": 0.8466
       }
     },
     "queue": {
-      "macro_f1": 0.481,
-      "accuracy": 0.557,
+      "macro_f1": 0.4906,
+      "accuracy": 0.56,
       "labels": [
         "Billing and Payments",
         "Customer Service",
@@ -100,206 +100,206 @@
       "per_class": [
         {
           "label": "Billing and Payments",
-          "precision": 0.8155,
-          "recall": 0.7658,
-          "f1": 0.7899,
+          "precision": 0.835,
+          "recall": 0.7705,
+          "f1": 0.8015,
           "support": 427
         },
         {
           "label": "Customer Service",
-          "precision": 0.5063,
-          "recall": 0.4893,
-          "f1": 0.4977,
+          "precision": 0.5129,
+          "recall": 0.4877,
+          "f1": 0.5,
           "support": 652
         },
         {
           "label": "General Inquiry",
           "precision": 1.0,
-          "recall": 0.1053,
-          "f1": 0.1905,
+          "recall": 0.1228,
+          "f1": 0.2188,
           "support": 57
         },
         {
           "label": "Human Resources",
-          "precision": 0.9231,
-          "recall": 0.3288,
-          "f1": 0.4848,
+          "precision": 0.9615,
+          "recall": 0.3425,
+          "f1": 0.5051,
           "support": 73
         },
         {
           "label": "IT Support",
-          "precision": 0.6145,
-          "recall": 0.3643,
-          "f1": 0.4574,
+          "precision": 0.5993,
+          "recall": 0.362,
+          "f1": 0.4513,
           "support": 442
         },
         {
           "label": "Product Support",
-          "precision": 0.4747,
-          "recall": 0.4518,
-          "f1": 0.463,
+          "precision": 0.4767,
+          "recall": 0.4773,
+          "f1": 0.477,
           "support": 706
         },
         {
           "label": "Returns and Exchanges",
-          "precision": 0.8197,
+          "precision": 0.7812,
           "recall": 0.2688,
-          "f1": 0.4049,
+          "f1": 0.4,
           "support": 186
         },
         {
           "label": "Sales and Pre-Sales",
-          "precision": 0.6667,
-          "recall": 0.1951,
-          "f1": 0.3019,
+          "precision": 0.7222,
+          "recall": 0.2114,
+          "f1": 0.327,
           "support": 123
         },
         {
           "label": "Service Outages and Maintenance",
-          "precision": 0.8795,
-          "recall": 0.4591,
-          "f1": 0.6033,
+          "precision": 0.8621,
+          "recall": 0.4717,
+          "f1": 0.6098,
           "support": 159
         },
         {
           "label": "Technical Support",
-          "precision": 0.5074,
-          "recall": 0.7872,
-          "f1": 0.6171,
+          "precision": 0.5095,
+          "recall": 0.777,
+          "f1": 0.6154,
           "support": 1175
         }
       ],
       "confusion": [
         [
-          327,
-          40,
-          0,
-          0,
-          3,
-          13,
-          0,
-          2,
-          0,
-          42
-        ],
-        [
-          16,
-          319,
-          0,
-          0,
-          17,
-          104,
-          2,
-          4,
-          0,
-          190
-        ],
-        [
-          1,
-          10,
-          6,
-          0,
-          0,
-          22,
-          0,
-          0,
-          1,
-          17
-        ],
-        [
-          1,
-          6,
-          0,
-          24,
-          4,
-          8,
-          0,
-          0,
-          0,
-          30
-        ],
-        [
-          10,
-          38,
-          0,
-          0,
-          161,
+          329,
           41,
-          3,
-          0,
-          1,
-          188
-        ],
-        [
-          11,
-          72,
           0,
           0,
-          22,
-          319,
-          4,
-          1,
-          1,
-          276
-        ],
-        [
-          4,
-          27,
-          0,
-          0,
-          3,
-          32,
-          50,
-          1,
-          0,
-          69
-        ],
-        [
-          8,
-          23,
-          0,
-          0,
-          5,
-          24,
-          0,
-          24,
-          0,
-          39
-        ],
-        [
-          4,
+          2,
           14,
           0,
+          3,
           0,
-          11,
-          10,
-          0,
-          0,
-          73,
-          47
+          38
         ],
         [
           19,
-          81,
+          318,
+          0,
+          0,
+          17,
+          109,
+          1,
+          3,
+          0,
+          185
+        ],
+        [
+          1,
+          8,
+          7,
+          0,
+          0,
+          23,
+          1,
+          0,
+          1,
+          16
+        ],
+        [
+          0,
+          4,
+          0,
+          25,
+          4,
+          11,
+          1,
+          0,
+          0,
+          28
+        ],
+        [
+          7,
+          34,
+          0,
+          0,
+          160,
+          41,
+          3,
           0,
           2,
-          36,
-          99,
-          2,
+          195
+        ],
+        [
+          6,
+          75,
+          0,
+          0,
+          22,
+          337,
+          5,
+          1,
+          0,
+          260
+        ],
+        [
+          5,
+          24,
+          0,
+          0,
           4,
+          35,
+          50,
+          0,
+          0,
+          68
+        ],
+        [
           7,
-          925
+          21,
+          0,
+          0,
+          4,
+          20,
+          0,
+          26,
+          0,
+          45
+        ],
+        [
+          2,
+          13,
+          0,
+          0,
+          14,
+          11,
+          0,
+          0,
+          75,
+          44
+        ],
+        [
+          18,
+          82,
+          0,
+          1,
+          40,
+          106,
+          3,
+          3,
+          9,
+          913
         ]
       ],
-      "calibration_error": 0.123,
+      "calibration_error": 0.1273,
       "macro_f1_by_language": {
-        "de": 0.4022,
-        "en": 0.5295
+        "de": 0.4135,
+        "en": 0.5384
       }
     },
     "priority": {
-      "macro_f1": 0.557,
-      "accuracy": 0.6002,
+      "macro_f1": 0.5642,
+      "accuracy": 0.6102,
       "labels": [
         "high",
         "low",
@@ -308,117 +308,117 @@
       "per_class": [
         {
           "label": "high",
-          "precision": 0.6077,
-          "recall": 0.6842,
-          "f1": 0.6437,
+          "precision": 0.6254,
+          "recall": 0.6977,
+          "f1": 0.6596,
           "support": 1555
         },
         {
           "label": "low",
-          "precision": 0.7304,
-          "recall": 0.2787,
-          "f1": 0.4035,
+          "precision": 0.7508,
+          "recall": 0.2739,
+          "f1": 0.4014,
           "support": 836
         },
         {
           "label": "medium",
-          "precision": 0.572,
-          "recall": 0.6861,
-          "f1": 0.6239,
+          "precision": 0.575,
+          "recall": 0.7004,
+          "f1": 0.6315,
           "support": 1609
         }
       ],
       "confusion": [
         [
-          1064,
-          33,
-          458
+          1085,
+          29,
+          441
         ],
         [
-          235,
-          233,
-          368
+          215,
+          229,
+          392
         ],
         [
-          452,
-          53,
-          1104
+          435,
+          47,
+          1127
         ]
       ],
-      "calibration_error": 0.0791,
+      "calibration_error": 0.0899,
       "macro_f1_by_language": {
-        "de": 0.498,
-        "en": 0.5964
+        "de": 0.5172,
+        "en": 0.5948
       }
     }
   },
-  "calibration_error": 0.0846,
-  "high_priority_incident_recall": 0.7511,
+  "calibration_error": 0.0925,
+  "high_priority_incident_recall": 0.7525,
   "high_priority_incident": {
-    "caught": 519,
+    "caught": 520,
     "total": 691,
-    "escalation_rate": 0.2457
+    "escalation_rate": 0.239
   },
   "escalation_tradeoff": [
     {
       "target_recall": 0.5,
-      "escalation_rate": 0.1285,
-      "precision": 0.6732,
-      "tickets_escalated": 514
+      "escalation_rate": 0.1275,
+      "precision": 0.6784,
+      "tickets_escalated": 510
     },
     {
       "target_recall": 0.6,
-      "escalation_rate": 0.1795,
-      "precision": 0.578,
-      "tickets_escalated": 718
+      "escalation_rate": 0.1755,
+      "precision": 0.5912,
+      "tickets_escalated": 702
     },
     {
       "target_recall": 0.7,
-      "escalation_rate": 0.2238,
-      "precision": 0.5408,
-      "tickets_escalated": 895
+      "escalation_rate": 0.2142,
+      "precision": 0.5648,
+      "tickets_escalated": 857
     },
     {
       "target_recall": 0.8,
-      "escalation_rate": 0.2978,
-      "precision": 0.4643,
-      "tickets_escalated": 1191
+      "escalation_rate": 0.2965,
+      "precision": 0.4663,
+      "tickets_escalated": 1186
     },
     {
       "target_recall": 0.9,
-      "escalation_rate": 0.3615,
-      "precision": 0.4302,
-      "tickets_escalated": 1446
+      "escalation_rate": 0.3568,
+      "precision": 0.4359,
+      "tickets_escalated": 1427
     },
     {
       "target_recall": 0.95,
-      "escalation_rate": 0.454,
-      "precision": 0.3618,
-      "tickets_escalated": 1816
+      "escalation_rate": 0.4465,
+      "precision": 0.3679,
+      "tickets_escalated": 1786
     }
   ],
   "pipeline": {
     "status_mix": {
-      "auto_draft": 0.7,
-      "human_review": 0.0333,
+      "auto_draft": 0.7333,
+      "human_review": 0.0,
       "escalate": 0.2667
     },
     "latency_ms": {
-      "p50": 3972.6,
-      "p95": 6355.0
+      "p50": 3709.3,
+      "p95": 8207.6
     },
     "stage_latency_ms": {
-      "guardrails": 2.3,
-      "classifier": 9.7,
-      "retrieval": 42.3,
-      "adversarial_review": 2454.3,
-      "draft_reply": 1883.0,
-      "verification": 5.0
+      "guardrails": 2.6,
+      "classifier": 12.6,
+      "retrieval": 39.4,
+      "adversarial_review": 2100.7,
+      "draft_reply": 1719.1,
+      "verification": 5.8
     },
-    "avg_cost_usd": 0.002147,
+    "avg_cost_usd": 0.002193,
     "cost_breakdown_usd": {
-      "adversarial_review": 0.001224,
-      "draft_reply": 0.000923
+      "adversarial_review": 0.001196,
+      "draft_reply": 0.000997
     },
     "cost_basis": "Tokens reported by Gemini on Vertex AI times list prices per million tokens: Flash-Lite $0.30 in / $2.50 out, Flash $0.75 in / $3.75 out",
     "tickets": 30
