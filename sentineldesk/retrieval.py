@@ -96,6 +96,30 @@ class TfidfEmbedder:
         return np.ascontiguousarray(normalize(vectors), dtype=np.float32)
 
 
+def mix_languages(
+    precedents: Sequence[Precedent],
+    count: int,
+    language: str,
+    min_other_language: int,
+    min_similarity: float,
+) -> list[Precedent]:
+    """Pick `count` precedents, keeping slots for strong matches in other languages.
+
+    Same-language tickets usually score a little higher, so without this a German
+    ticket would rarely see the English resolution that answers it best.
+    """
+    other_language = [
+        precedent
+        for precedent in precedents
+        if precedent.language != language and precedent.similarity >= min_similarity
+    ][:min_other_language]
+    remaining = [
+        precedent for precedent in precedents if precedent not in other_language
+    ]
+    chosen = other_language + remaining[: count - len(other_language)]
+    return sorted(chosen, key=lambda precedent: precedent.similarity, reverse=True)
+
+
 def create_embedder(kind: str | None = None) -> TextEmbedder:
     """Pick an embedder: "sentence-transformers" (default) or "tfidf"."""
     kind = (kind or os.getenv("SENTINEL_EMBEDDER", "sentence-transformers")).lower()

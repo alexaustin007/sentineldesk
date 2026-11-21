@@ -46,6 +46,22 @@ def high_priority_incident_share(
     return incident_weight / total_weight
 
 
+def classifier_incident_score(labels: TicketLabels, config: TriageConfig) -> float:
+    """Calibrated probability the classifier gives to "high priority AND Incident".
+
+    The type and priority models are separate, so their probabilities multiply.
+    """
+    high_probability = sum(
+        probability
+        for label, probability in labels.priority.probabilities.items()
+        if label.lower() in config.high_priority_labels
+    )
+    incident_probability = labels.type.probabilities.get(
+        config.incident_type_label, 0.0
+    )
+    return high_probability * incident_probability
+
+
 def find_mandatory_escalation(
     classifier_labels: TicketLabels,
     precedents: Sequence[Precedent],
@@ -53,12 +69,14 @@ def find_mandatory_escalation(
 ) -> list[str]:
     """High-priority incidents always go to the on-call engineer.
 
-    Either agent is enough. This favors recall on purpose: a missed outage costs
-    far more than an extra page.
+    Either agent is enough, which favors recall: a missed outage costs far more
+    than an extra page. Each agent must be confident, so neither escalates on a
+    coin flip between labels.
     """
     sources = []
-    if is_high_priority_incident(classifier_labels, config):
-        sources.append("the classifier")
+    classifier_score = classifier_incident_score(classifier_labels, config)
+    if classifier_score >= config.min_classifier_incident_score:
+        sources.append(f"the classifier ({classifier_score:.0%} sure)")
     incident_share = high_priority_incident_share(precedents, config)
     if incident_share >= config.min_incident_precedent_share:
         sources.append(f"{incident_share:.0%} of the precedent vote")

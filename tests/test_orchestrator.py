@@ -194,6 +194,29 @@ def test_reviewer_escalation_stops_the_draft(
     assert result.draft_reply is None
 
 
+def test_reviewer_high_priority_incident_needs_human_not_page(
+    make_orchestrator: OrchestratorFactory,
+) -> None:
+    provider = reviewer_returning(
+        {
+            "priority": "high",
+            "type": "Incident",
+            "queue": "IT Support",
+            "escalate": False,
+            "findings": ["Severe for this user, but nothing for on-call to do now"],
+            "rationale": "Customer cannot log in.",
+        }
+    )
+
+    result = make_orchestrator(classifier=BILLING_CLASSIFIER, provider=provider).triage(
+        PASSWORD_SUBJECT, PASSWORD_BODY
+    )
+
+    assert result.status == HUMAN_REVIEW
+    assert result.draft_reply  # the human gets a draft to approve
+    assert any("must approve" in reason for reason in result.reasons)
+
+
 def test_failed_review_never_auto_approves(
     make_orchestrator: OrchestratorFactory,
 ) -> None:

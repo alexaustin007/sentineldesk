@@ -27,7 +27,7 @@ STATUS_CODES = {
 # Reason prefix -> code that picks the console's icon for that reason.
 REASON_CODES: list[tuple[str, str]] = [
     ("High-priority Incident", "HIGH_PRIORITY_INCIDENT"),
-    ("Reviewed labels are a high-priority Incident", "HIGH_PRIORITY_INCIDENT"),
+    ("Reviewer rated it a high-priority Incident", "HIGH_PRIORITY_INCIDENT"),
     ("Possible prompt injection", "PROMPT_INJECTION"),
     ("Unsupported language", "UNSUPPORTED_LANGUAGE"),
     ("No close historical precedent", "LOW_SIMILARITY"),

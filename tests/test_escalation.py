@@ -48,4 +48,11 @@ def test_classifier_alone_can_escalate() -> None:
 
     reasons = find_mandatory_escalation(classifier, [], TriageConfig())
 
-    assert reasons == ["High-priority Incident flagged by the classifier"]
+    # 0.8 (high) x 0.8 (Incident) = 64%
+    assert reasons == ["High-priority Incident flagged by the classifier (64% sure)"]
+
+
+def test_unsure_classifier_does_not_escalate() -> None:
+    classifier = labels_from_choices("Incident", "Technical Support", "high", 0.45)
+
+    assert find_mandatory_escalation(classifier, [], TriageConfig()) == []

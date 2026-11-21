@@ -117,7 +117,13 @@ class GeminiProvider:
         enterprise: bool = False,
     ) -> None:
         from google import genai  # imported here so mock mode works without the SDK
+        from google.genai import types
 
+        # Cap each call so two deep-path calls finish inside the console's 30 s
+        # timeout. A call that times out counts as unavailable (human review).
+        http_options = types.HttpOptions(
+            timeout=int(os.getenv("SENTINEL_LLM_TIMEOUT_MS", "12000"))
+        )
         if enterprise:
             project = os.getenv("GOOGLE_CLOUD_PROJECT")
             if not project:
@@ -125,11 +131,14 @@ class GeminiProvider:
             # Gemini 3 models are served from the global endpoint by default.
             location = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
             self._client = genai.Client(
-                enterprise=True, project=project, location=location
+                enterprise=True,
+                project=project,
+                location=location,
+                http_options=http_options,
             )
             self.name = "gemini-enterprise"
         else:
-            self._client = genai.Client(api_key=api_key)
+            self._client = genai.Client(api_key=api_key, http_options=http_options)
             self.name = "gemini"
         self._settings = settings or load_model_settings()
 

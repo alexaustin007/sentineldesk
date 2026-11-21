@@ -38,7 +38,7 @@ from sentineldesk.guardrails import screen_ticket
 from sentineldesk.llm import LLMProvider, LLMUnavailableError
 from sentineldesk.precedent_vote import strongest_similarity, vote_on_labels
 from sentineldesk.reply_generation import draft_reply
-from sentineldesk.retrieval import PrecedentIndex
+from sentineldesk.retrieval import PrecedentIndex, mix_languages
 from sentineldesk.schemas import (
     Attachment,
     ScreeningResult,
@@ -94,9 +94,10 @@ class TriageOrchestrator:
         with timer.stage("classifier"):
             classifier_labels = self.classifier.predict(ticket.subject, ticket.body)
         with timer.stage("retrieval"):
-            retrieved = self.precedent_index.search(
-                ticket.text, top_k=self.config.retrieval_top_k
+            candidates = self.precedent_index.search(
+                ticket.text, top_k=self.config.retrieval_candidates
             )
+        retrieved = candidates[: self.config.retrieval_top_k]
         top_similarity = strongest_similarity(retrieved)
         has_evidence = top_similarity >= self.config.min_top_similarity
         # The precedent agent votes only when it found genuinely similar tickets;
@@ -115,7 +116,14 @@ class TriageOrchestrator:
             disagreements=find_disagreements(
                 classifier_labels, rag_labels, self.config.heads_that_must_agree
             ),
-            precedents=retrieved[: self.config.precedents_shown],
+            # Cross-lingual evidence: keep strong matches in the other language.
+            precedents=mix_languages(
+                candidates,
+                count=self.config.precedents_shown,
+                language=screening.language,
+                min_other_language=self.config.min_cross_lingual_precedents,
+                min_similarity=self.config.min_top_similarity,
+            ),
             pii_counts=screening.pii_counts,
             injection_signals=screening.injection_signals,
         )
@@ -125,17 +133,18 @@ class TriageOrchestrator:
         if missing_detail:
             return self._finish(result, timer, [], missing_detail)
 
+        # Inputs that must not reach a model at all. Checked before escalation so a
+        # prompt-injection attempt is reported as one, not as an outage.
+        review_reasons = find_screening_issues(screening)
+        if review_reasons:
+            return self._finish(result, timer, [], review_reasons)
+
         # Mandatory escalation: page the on-call engineer without any LLM call.
         escalation_reasons = find_mandatory_escalation(
             classifier_labels, voting_precedents, self.config
         )
         if escalation_reasons:
             return self._finish(result, timer, escalation_reasons, [])
-
-        # Inputs that must not reach a model at all.
-        review_reasons = find_screening_issues(screening)
-        if review_reasons:
-            return self._finish(result, timer, [], review_reasons)
 
         # Decide how much compute this ticket deserves.
         risk_signals = find_risk_signals(screening.masked_text)
@@ -203,14 +212,14 @@ class TriageOrchestrator:
             result.final_labels, review, self._label_options
         )
         result.adversarial_findings = [*review.findings, *notes]
-        escalation_reasons = []
         if review.escalate:
-            escalation_reasons.append(
-                f"Adversarial reviewer escalated: {review.rationale}"
-            )
+            return [f"Adversarial reviewer escalated: {review.rationale}"], []
         if is_high_priority_incident(result.final_labels, self.config):
-            escalation_reasons.append("Reviewed labels are a high-priority Incident")
-        return escalation_reasons, []
+            # High-priority incidents always need a human. The reviewer did not ask
+            # to page on-call, so a human approves the drafted reply instead.
+            reason = "Reviewer rated it a high-priority Incident; a human must approve"
+            return [], [reason]
+        return [], []
 
     def _draft_and_verify(
         self, result: TriageResult, timer: StageTimer, screening: ScreeningResult
