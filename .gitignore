@@ -1,7 +1,16 @@
+# Local environments and secrets
+.venv/
+.env
+
+# Organizer dataset, CSV files, and generated artifacts stay local
 /data/
 *.[Cc][Ss][Vv]
-.venv/
+artifacts/
 *.joblib
-*.pyc
-__pycache__/
 holdout_predictions.json
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
