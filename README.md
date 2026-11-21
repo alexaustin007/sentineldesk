@@ -26,6 +26,19 @@ Keep the downloaded CSV local and commit code and instructions to GitHub.
 
 Read [AGENTS.md](AGENTS.md) before editing. If you use a coding agent, point it to that file when you start work. The guide covers Python style, how to organize code, and the rules for working with the dataset.
 
+### Start from a branch
+
+Every change to `main` goes through a pull request, including changes from the repository owner.
+
+```bash
+git fetch origin
+git switch -c fix/ticket-validation origin/main
+```
+
+Use your own short, descriptive branch name. If you are working from a fork, fetch the latest `main` from the upstream SentinelDesk repository and branch from there.
+
+### Verify and open a pull request
+
 Install Ruff in your development environment and run these commands from the repository root.
 
 ```bash
@@ -35,4 +48,4 @@ ruff check .
 ruff format --check .
 ```
 
-Ruff uses four spaces per indentation level. Open a pull request against `main` and describe how you verified the change. The **Python quality** workflow runs lint and format checks on pull requests and on pushes to `main`.
+Ruff uses four spaces per indentation level. Commit your changes, push your branch to the repository or your fork, and open a pull request against SentinelDesk’s `main`. Include a brief summary and explain how you verified the change. Merge through the pull request once **Ruff lint and format** passes. The **Python quality** workflow also checks pushes to `main`.

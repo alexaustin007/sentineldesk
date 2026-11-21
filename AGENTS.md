@@ -15,7 +15,9 @@ Follow these guidelines when adding or changing code. See the [contributor instr
 - Make a reproducible 80/20 split before training or indexing. Train and build the retrieval index from the historical 80%.
 - Give the app only the ticket subject and body during holdout evaluation. Use holdout labels only for scoring and keep holdout answers out of training, retrieval, and prompts.
 
-## Before opening a pull request
+## Branches and pull requests
 
-- Run `ruff format .`, `ruff check .`, and `ruff format --check .` from the repository root.
-- Verify the behavior you changed and describe how you checked it in the pull request.
+- Start each change from the latest `main` on a separate branch. This applies to maintainers, the repository owner, and coding agents, including for documentation and small fixes.
+- Run `ruff format .`, `ruff check .`, and `ruff format --check .` from the repository root. Verify the behavior you changed.
+- Push your branch and open a pull request targeting `main`. Summarize the change and how you verified it.
+- Merge through the pull request after the **Ruff lint and format** check passes. If CI fails, fix the issue on the same branch and wait for the check to pass.
