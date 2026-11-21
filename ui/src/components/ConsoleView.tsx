@@ -34,11 +34,11 @@ export function ConsoleView(p: ConsoleViewProps) {
   const sticky = p.framed ? "" : "lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto";
   return (
     <div
-      className={`grid lg:grid-cols-[400px_minmax(0,1fr)] ${
+      className={`grid lg:grid-cols-[420px_minmax(0,1fr)] ${
         p.framed ? "overflow-hidden rounded-lg border border-line" : "min-h-[calc(100vh-48px)]"
       }`}
     >
-      <aside className={`flex flex-col gap-7 border-b border-line bg-surface px-6 py-5 lg:border-r lg:border-b-0 ${sticky}`}>
+      <aside className={`flex flex-col gap-8 border-b border-line bg-surface px-7 py-6 lg:border-r lg:border-b-0 ${sticky}`}>
         <TicketInput
           subject={p.subject}
           body={p.body}
@@ -54,7 +54,7 @@ export function ConsoleView(p: ConsoleViewProps) {
         />
         <Pipeline run={p.run} />
       </aside>
-      <main className="rise min-w-0 bg-bg px-6 py-5">
+      <main className="rise min-w-0 bg-bg px-8 py-6">
         <div className="mx-auto max-w-[1080px]">
           <ResultsPane run={p.run} onRetry={p.onRetry} />
         </div>

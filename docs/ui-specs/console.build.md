@@ -55,7 +55,7 @@ Stack: Vite 6, React 18, TypeScript 5.8 (strict), Tailwind v4 (`@tailwindcss/vit
 - [x] Panes stack below 1024 px with no horizontal scroll.
 - [x] One primary button, 4 chips, no language picker, no "AI" styling. The banner is the only saturated fill (B1).
 
-Screenshots were taken locally and are not committed.
+Screenshots (1440 px) of the current build are in `docs/ui-screenshots/`.
 
 ## Contract gaps (for backend owners; contract not edited)
 
@@ -110,7 +110,7 @@ The owner said the UI looked sparse, washed-out and generic. The changes below a
 | 14 | Dark Triage fill is `#3d61cb` with white text (5.6:1), down from the bright `#7d9cf5`. |
 | also | Long queue/subject labels get a `title` tooltip. Retry is a secondary button, so there is still exactly one primary (D1). |
 
-Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements (bars identical, subjects visible, no horizontal scroll). No console errors in the browser pane. Screenshots are in the shared notes folder with the `v2-` prefix.
+Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements (bars identical, subjects visible, no horizontal scroll). No console errors in the browser pane. Screenshots were kept locally with the `v2-` prefix.
 
 ## Entry-first flow (team request)
 
@@ -119,7 +119,7 @@ Re-checked: typecheck and build pass. 1440 light and dark, and 1024 measurements
 - **New ticket** cancels any in-flight request, clears the fields and returns to the entry view with the body focused.
 - **Error and timeout** still render in the results pane with Retry (unchanged).
 - On `/dev/states`, `#entry` and `#validation` render the entry view. The other cases still show the two-pane layout.
-- Verified at 1440 px light and dark: entry, loading, result B, New ticket, and `?mock=error` with Retry. Typecheck and build pass. Screenshots are in the shared notes folder with the `v3-` prefix.
+- Verified at 1440 px light and dark: entry, loading, result B, New ticket, and `?mock=error` with Retry. Typecheck and build pass. Screenshots were kept locally with the `v3-` prefix.
 
 ## Example tickets as quiet links (team request)
 
@@ -175,7 +175,7 @@ The UI now follows the revised `contracts/triage_response.example.json` and UI_W
   - New `humanReviewDeep.ts` (wireframe E) → `human_review` with a draft, route `deep`, disagreement on queue, one removed claim, one reason without a code, and one precedent without language/subject. It is only on `/dev/states#e`, because a fifth link would break the one line and D1's limit of 4.
 
   All precedent IDs are still below `TKT-49412`.
-- **Verified:** typecheck and build pass. Checked at 1440 px: `#e` in light (banner, Why rows, draft with removed claim, precedent without subject) and the VPN example on `/` in dark (red, no draft, 3 pipeline stages, cost hidden). Screenshots are in the shared notes folder with the `v4-` prefix. No review loop, per the team.
+- **Verified:** typecheck and build pass. Checked at 1440 px: `#e` in light (banner, Why rows, draft with removed claim, precedent without subject) and the VPN example on `/` in dark (red, no draft, 3 pipeline stages, cost hidden). Screenshots were kept locally with the `v4-` prefix. No review loop, per the team.
 - **Contract gap carried over from §3.2:** `critical_incident_risk` and margins may not reach the UI until PR #5's `TicketLabels` has slots for them. The UI hides those rows when they're null or absent.
 
 ## Expandable precedents with full evidence (team request)
@@ -225,3 +225,32 @@ Follows UI_WORKFLOW §4.1, tweaks row "Expandable precedents with full evidence"
 - **`/dev/states`:** `#bad-response` (wrong types, every path listed), `#raw-pr5-shape` and `#normalized` (a minimal valid response: red escalate with the OTHER reason, no lang badge, confidences clamped). All three run through the real validator.
 - **Test:** `node ui/src/lib/validate.test.ts` (Node ≥ 22.18 strips types; no framework, no `tsx`) runs 12 checks: the contract example, the raw shape, path listing, non-object body, normalization defaults, unknown status, and all 6 mocks. All pass. The test is excluded from `tsc` in `ui/tsconfig.json` because it uses `node:assert`.
 - **Verified:** typecheck and build pass. At 1440 px, `/?mock=raw` on the console shows the error with Retry; `#bad-response`, `#raw-pr5-shape` and `#normalized` render as described. Screenshots have the `v6-` prefix. No review loop.
+
+## Readability pass (UI_WORKFLOW §5 last bullets, UX_RULES C2)
+
+- **No all caps anywhere.**
+  - `.label` is now 13 px / 500 / sentence case, with no `text-transform` and no tracking.
+  - Banner text is sentence case: "Auto-draft ready", "Needs human review", "Escalate to on-call engineer" (22 px semibold, not shouty).
+  - Only EN/DE, TKT IDs and machine codes stay uppercase. A browser check found 0 elements with `text-transform: uppercase`.
+- **Type:**
+  - Inter from Google Fonts, weights 400/500/600 only. 15 px base with 1.5 line height; the draft text is 16 px with 1.6.
+  - `.num` is now Inter with tabular numbers (`tnum`) for similarity, confidence, latency and cost.
+  - The new `.mono` class (IBM Plex Mono) is used only for ticket IDs, citation chips, EN/DE and error codes.
+  - All text tokens stay ≥ 4.5:1 (light `ink-3` is 5.8:1 on bg).
+- **Cards:**
+  - `Section` is a rounded card with 24 px horizontal padding and a 17 px semibold sentence-case heading (`.heading`), with muted meta on the right. There's no header divider; results cards sit 24 px apart (`gap-6`).
+  - Headings: "Classification", "Draft reply · for human review", "Precedents · 3".
+  - The draft card is the main output: stronger border, soft shadow, 16 px text, a larger Copy button, and removed claims in a tinted block instead of behind a divider.
+- **Calm on first open:**
+  - "Why?" is collapsed by default in every state.
+  - After a result, the pipeline collapses to one line, "✓ Completed in 1.10 s · 5 steps · fast route ›", which expands on click; Pipeline › collapses it again. It stays expanded while loading and on error or timeout.
+  - Precedents start collapsed, and the entry view is unchanged apart from its larger type.
+- **Fewer borders:** banner meta and footer dividers, section header borders, the draft footer divider and tag borders are gone.
+- **Sizes:**
+  - Inputs: 15 px, 44 px tall subject field, 48 px Triage button.
+  - Header tabs: 15 px "Console" / "Metrics" with an underline for the active tab.
+  - Classification: 16 px labels and values.
+  - Precedents: 15.5 px subject, 14.5 px preview.
+- **Unchanged:** citations (hover, click to open and flash the precedent), single-open precedents, every state on `/dev/states`, and the runtime check. Verified again: the pipeline summary expands to 5 steps, Why? opens 7 checks, and a `[TKT-22548]` click opens only that row.
+- **Verified:** typecheck, build and the 16 Node checks pass. Checked at 1440 px: injection in light (`v8-console-D-light.png`) and German billing in dark (`v8-console-B-dark.png`). No review loop.
+

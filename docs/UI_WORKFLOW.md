@@ -268,7 +268,9 @@ The emoji idea, adjusted to fit the product: the person using this console is an
 - One neutral palette plus **one accent**. Colour is reserved for meaning: red = escalate/high, amber = low confidence/medium, green = auto-draft OK. Nothing decorative.
 - No gradients, glassmorphism, sparkle icons, "✨ AI" labels, or a grid of identical rounded cards.
 - Use monospace for ticket IDs, scores and latency so numbers line up. Use a clear sans for prose.
-- Use real hierarchy: banner, then classification, then draft, then evidence, with section labels in small caps, not big headings.
+- Use real hierarchy: banner, then classification, then draft, then evidence. Each section has a clear **sentence-case heading** (about 17 px, semibold) and its own card with generous padding. **No all-caps text anywhere** except codes that are capitalised by nature (`EN`, `DE`, `TKT-…`).
+- Readability first, because judges see it cold and often on a projector. Inter for text, with `tabular-nums` for figures, at a 15–16 px base size, 1.5 line height for prose and the draft at 16 px. Monospace only for ticket IDs. Body text contrast is at least 4.5:1.
+- Calm on first open: progressive disclosure. One decision line up top, and details ("Why?", pipeline timings, precedent evidence) collapsed until asked for.
 - Support dark and light themes (projectors vary).
 - Every number has a unit or a scale: `0.83 sim`, `2.14 s`, confidence bars with the threshold tick drawn on.
 

@@ -23,19 +23,25 @@ export function DraftReply({
   const byId = new Map(res.precedents.map((p) => [p.ticket_id, p]));
   const removed = res.guardrails?.removed_claims ?? [];
 
+  // The draft is the main output: slightly stronger card, larger text (UI_WORKFLOW §5).
+  const MAIN = "border-line-strong shadow-[0_1px_3px_rgb(0_0_0/0.06)]";
+
   if (!draft) {
-    const gap = res.escalation?.reasons?.some((r) => r.code === "LOW_SIMILARITY");
+    // The reason decides the line (PR #5: escalate pages first; screening blocks return early).
+    const codes = new Set((res.escalation?.reasons ?? []).map((r) => r.code));
+    const blocked = codes.has("PROMPT_INJECTION") || codes.has("UNSUPPORTED_LANGUAGE") || res.input?.language_supported === false;
+    const line = escalated
+      ? "No draft: paged on-call before drafting"
+      : blocked
+        ? "No draft: blocked by guardrails before drafting"
+        : codes.has("LOW_SIMILARITY")
+          ? "No draft: no close precedent to ground a reply"
+          : status === "human_review"
+            ? "No draft: held for human review"
+            : "No draft: the generator returned none";
     return (
-      <Section label="Draft" meta="not generated">
-        <p className="px-5 py-4 text-[14.5px] text-ink-2">
-          {escalated
-            ? "No draft: paged on-call before drafting"
-            : gap
-              ? "No draft: there is no past resolution to ground a reply in."
-              : status === "human_review"
-                ? "No draft: held for human review."
-                : "No draft: the generator returned none."}
-        </p>
+      <Section label="Draft reply" meta="not generated">
+        <p className="text-[16px] text-ink-2">{line}</p>
         <RemovedClaims claims={removed} />
       </Section>
     );
@@ -57,19 +63,18 @@ export function DraftReply({
 
   return (
     <Section
-      label={
+      className={MAIN}
+      label={header ? `Draft reply · ${header}` : "Draft reply"}
+      meta={
         <>
-          Draft{header && <span> · {header}</span>} · {langCode(draft.language)}
+          <span className="mono">{langCode(draft.language)}</span> · {cited.length} citation{cited.length === 1 ? "" : "s"}
         </>
       }
-      meta={`${cited.length} citation${cited.length === 1 ? "" : "s"}`}
     >
-      <div className="px-5 pt-4 pb-4">
-        <p className="max-w-[86ch] text-[15px] leading-[1.75] text-ink">{renderWithCitations(draft.text, byId, onCite, onHover)}</p>
-      </div>
+      <p className="max-w-[80ch] text-[16px] leading-[1.6] text-ink">{renderWithCitations(draft.text, byId, onCite, onHover)}</p>
       <RemovedClaims claims={removed} />
-      <div className="flex items-center gap-3 border-t border-line px-5 py-2.5">
-        <p className={`text-[12.5px] ${res.guardrails?.citations_valid === false ? "font-medium text-amber" : "text-ink-3"}`}>
+      <div className="mt-5 flex items-center gap-4">
+        <p className={`text-[14px] ${res.guardrails?.citations_valid === false ? "font-medium text-amber" : "text-ink-3"}`}>
           {res.guardrails?.citations_valid === false
             ? "Some citations do not match a retrieved precedent."
             : `Grounded in ${found} of ${res.precedents.length} precedent${res.precedents.length === 1 ? "" : "s"}`}
@@ -77,7 +82,7 @@ export function DraftReply({
         <button
           type="button"
           onClick={copy}
-          className="ml-auto flex h-8 items-center gap-2 rounded-md border border-field bg-surface px-3 text-[13px] font-medium text-ink hover:border-ink-2"
+          className="ml-auto flex h-10 items-center gap-2 rounded-lg border border-field bg-surface px-4 text-[14.5px] font-medium text-ink hover:border-ink-2"
         >
           <IconCopy />
           {internal ? "Copy as internal note" : "Copy draft"}
@@ -91,11 +96,11 @@ export function DraftReply({
 function RemovedClaims({ claims }: { claims: string[] }) {
   if (!claims.length) return null;
   return (
-    <div className="border-t border-line px-5 py-3">
-      <p className="text-[12.5px] font-medium text-ink-2">Removed by verifier (unsupported):</p>
+    <div className="mt-4 rounded-lg bg-surface-2 px-4 py-3">
+      <p className="text-[14px] font-medium text-ink-2">Removed by verifier (unsupported)</p>
       <ul className="mt-1 space-y-1">
         {claims.map((c, i) => (
-          <li key={i} className="text-[13.5px] text-ink-3 line-through decoration-ink-3/70">
+          <li key={i} className="text-[14.5px] text-ink-3 line-through decoration-ink-3/70">
             “{c}”
           </li>
         ))}
@@ -153,7 +158,7 @@ function CitationChip({
         onFocus={show}
         onBlur={hide}
         aria-describedby={open ? `pop-${id}` : undefined}
-        className={`num relative mx-0.5 rounded-[3px] border px-1 py-px align-baseline text-[12.5px] leading-none transition-colors after:absolute after:-inset-x-1 after:-inset-y-2 after:content-[''] ${
+        className={`mono relative mx-0.5 rounded-[4px] border px-1 py-px align-baseline text-[13.5px] leading-none transition-colors after:absolute after:-inset-x-1 after:-inset-y-2 after:content-[''] ${
           p
             ? "border-accent/40 bg-accent-soft text-accent hover:border-accent"
             : "cursor-not-allowed border-dashed border-amber-line text-amber"
@@ -165,19 +170,19 @@ function CitationChip({
         <span
           id={`pop-${id}`}
           role="tooltip"
-          className="absolute top-full left-0 z-30 mt-2 block w-80 rounded-md border border-line-strong bg-surface p-3 text-left text-[13px] leading-snug shadow-lg"
+          className="absolute top-full left-0 z-30 mt-2 block w-80 rounded-lg border border-line-strong bg-surface p-3.5 text-left text-[14px] leading-snug shadow-lg"
         >
           {p ? (
             <>
-              <span className="num flex justify-between text-[12px] text-ink-3">
-                <span>{p.ticket_id}</span>
-                <span>
+              <span className="flex justify-between text-[13px] text-ink-3">
+                <span className="mono">{p.ticket_id}</span>
+                <span className="num">
                   {fmtScore(p.similarity)} sim{p.language ? ` · ${langCode(p.language)}` : ""}
                 </span>
               </span>
               {p.subject && <span className="mt-1 block font-medium text-ink">{p.subject}</span>}
               <span className="mt-1 line-clamp-2 block text-ink-2">{p.answer_snippet}</span>
-              <span className="mt-2 block text-[12px] text-ink-3">Click to jump to precedent</span>
+              <span className="mt-2 block text-[13px] text-ink-3">Click to jump to precedent</span>
             </>
           ) : (
             <span className="text-amber">{id} is not in the retrieved precedents.</span>

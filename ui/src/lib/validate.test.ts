@@ -76,4 +76,86 @@ for (const name of ["vpnOutage", "deBilling", "knowledgeGap", "injection", "huma
   });
 }
 
+const { injection } = await import("../mocks/injection.ts");
+ok("injection mock matches PR #5's early return (screening before routing, drafting and LLM calls)", () => {
+  const r = parseTriageResponse(injection);
+  assert.equal(r.escalation.status, "human_review");
+  assert.deepEqual(r.escalation.reasons.map((x) => x.code), ["PROMPT_INJECTION"]);
+  assert.equal(r.route.path, "none");
+  assert.equal(r.draft, null);
+  assert.equal(r.usage?.estimated_cost_usd ?? 0, 0);
+  assert.deepEqual(Object.keys(r.latency_ms).filter((k) => k !== "total").sort(), ["classifier", "guardrails", "retrieval"]);
+  assert.ok(r.latency_ms.total < 500);
+});
+
+// --- metrics.json ---
+const { parseMetrics, MetricsError } = await import("./validateMetrics.ts");
+const metrics = JSON.parse(readFileSync(new URL("../../../contracts/metrics.example.json", import.meta.url), "utf8"));
+const throwsMetrics = (raw: unknown, re: RegExp) =>
+  assert.throws(
+    () => parseMetrics(raw),
+    (e: unknown) => e instanceof MetricsError && re.test(e.message),
+  );
+
+ok("metrics example passes, sample flag kept", () => {
+  const m = parseMetrics(metrics);
+  assert.equal(m.sample, true);
+  assert.equal(m.heads.queue.confusion.length, m.heads.queue.labels.length);
+});
+
+ok("metrics example is self-consistent (support = confusion row sums)", () => {
+  for (const h of ["type", "queue", "priority"] as const) {
+    const head = metrics.heads[h];
+    head.labels.forEach((l: string, i: number) => {
+      const row = head.confusion[i].reduce((a: number, b: number) => a + b, 0);
+      assert.equal(head.per_class.find((c: { label: string }) => c.label === l).support, row, `${h}/${l}`);
+    });
+  }
+});
+
+ok("non-square confusion and missing recall are both listed", () =>
+  throwsMetrics(
+    { ...metrics, heads: { ...metrics.heads, queue: { ...metrics.heads.queue, confusion: [[1, 2]] } }, high_priority_incident_recall: "x" },
+    /heads\.queue\.confusion \(must be 10×10.*high_priority_incident_recall/,
+  ));
+
+ok("hover fields: HPI counts match the recall, trade-off rows carry precision + tickets", () => {
+  const m = parseMetrics(metrics);
+  const c = m.high_priority_incident!;
+  assert.equal(Math.round((c.caught / c.total) * 1000) / 1000, m.high_priority_incident_recall);
+  for (const r of m.escalation_tradeoff!) {
+    assert.equal(typeof r.precision, "number");
+    assert.equal(r.tickets_escalated, Math.round(r.escalation_rate * metrics.split.holdout));
+  }
+  assert.equal(typeof m.pipeline?.cost_basis, "string");
+  assert.equal(typeof m.split?.leakage_detail, "string");
+});
+
+ok("panel fields agree: urgent caught = recall × total = precision × escalated; cost breakdown sums", () => {
+  const m = parseMetrics(metrics);
+  const total = m.high_priority_incident!.total;
+  for (const r of m.escalation_tradeoff!) {
+    assert.ok(Math.abs(r.precision! * r.tickets_escalated! - r.target_recall * total) <= 1, `row ${r.target_recall}`);
+  }
+  const costs = Object.values(m.pipeline!.cost_breakdown_usd!);
+  assert.ok(Math.abs(costs.reduce((a, b) => a + b, 0) - m.pipeline!.avg_cost_usd!) < 1e-9);
+  assert.ok(Object.keys(m.pipeline!.stage_latency_ms!).includes("draft_reply"));
+  const bad = parseMetrics({ ...metrics, pipeline: { ...metrics.pipeline, stage_latency_ms: { x: "slow" }, cost_breakdown_usd: 3 } });
+  assert.equal(bad.pipeline?.stage_latency_ms, null);
+  assert.equal(bad.pipeline?.cost_breakdown_usd, null);
+});
+
+ok("malformed hover fields are dropped, not fatal", () => {
+  const m = parseMetrics({ ...metrics, high_priority_incident: { caught: "x", total: 0 }, escalation_tradeoff: [{ target_recall: 0.9, escalation_rate: 0.2, precision: "?" }] });
+  assert.equal(m.high_priority_incident, null);
+  assert.equal(m.escalation_tradeoff![0].precision, undefined);
+});
+
+ok("missing optional parts are dropped, not fatal", () => {
+  const m = parseMetrics({ heads: metrics.heads, high_priority_incident_recall: 0.9, pipeline: { status_mix: { auto_draft: 1 } } });
+  assert.deepEqual(m.escalation_tradeoff, []);
+  assert.equal(m.pipeline?.status_mix, null);
+  assert.equal(m.split, undefined);
+});
+
 console.log(`\n${n} checks passed`);

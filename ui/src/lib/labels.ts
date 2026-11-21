@@ -10,9 +10,9 @@ export function normalizeStatus(status: unknown): EscalationStatus {
 }
 
 export const STATUS_TEXT: Record<EscalationStatus, string> = {
-  auto_draft: "Auto-Draft Ready",
-  human_review: "Needs Human Review",
-  escalate: "Escalate to On-Call Engineer",
+  auto_draft: "Auto-draft ready",
+  human_review: "Needs human review",
+  escalate: "Escalate to on-call engineer",
 };
 
 export function thresholdsOf(r: TriageResponse): { t: EscalationThresholds; fallback: boolean } {

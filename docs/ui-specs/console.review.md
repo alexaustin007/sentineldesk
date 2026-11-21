@@ -2,7 +2,7 @@
 
 Graded against UI_WORKFLOW §1, §3.1, §4.1 (wireframes A–D and the tweaks table) and §5, and every Check in UX_RULES. There is no planner spec (`console.md`). Each item below was checked in Chrome (DevTools MCP, true 1440 px viewport) against the mock dev server on :5173. Claims in `console.build.md` were re-tested, not assumed.
 
-Screenshots were taken locally and are not committed.
+Review screenshots were taken locally during the review pass and are not committed; current screenshots are in `docs/ui-screenshots/`. File names below refer to that local review set.
 
 ## Loop 1
 
@@ -84,7 +84,7 @@ Clicking Triage changes the DOM (`aria-busy`, "Triaging…", button disabled) **
 
 ## Loop 2 (quick)
 
-Time-boxed pass, main console `/` only, blockers and majors only. Captures were taken with DevTools emulation at 1440x900 and 1024x800, in light and dark. Screenshots are in the side-session notes folder with the `review2-` prefix. Note: the builder was editing live during this pass. The sample chips changed from 2×2 pills above Triage to a "Try an example:" link row below Triage between captures. This review grades the later version.
+Time-boxed pass, main console `/` only, blockers and majors only. Captures were taken with DevTools emulation at 1440x900 and 1024x800, in light and dark. Screenshots were kept locally with the `review2-` prefix. Note: the builder was editing live during this pass. The sample chips changed from 2×2 pills above Triage to a "Try an example:" link row below Triage between captures. This review grades the later version.
 
 | # | severity | rule | what you saw | fix |
 |---|---|---|---|---|

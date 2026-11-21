@@ -38,7 +38,7 @@ function highlight(text: string, needles: string[]): ReactNode[] {
   return out;
 }
 
-const FIELD = "w-full rounded-md border border-field px-3 py-2 text-[14px] leading-[1.55]";
+const FIELD = "w-full rounded-lg border border-field px-3.5 py-2.5 text-[15px] leading-[1.5]";
 
 export function TicketInput({
   subject,
@@ -82,14 +82,14 @@ export function TicketInput({
       }}
     >
       <div className="flex min-h-8 items-center justify-between">
-        <h2 className={variant === "entry" ? "text-[18px] font-semibold tracking-[-0.01em] text-ink" : "label"}>
+        <h2 className={variant === "entry" ? "text-[20px] font-semibold text-ink" : "heading"}>
           {variant === "entry" ? "Triage a ticket" : "Ticket"}
         </h2>
         {onNew && (
           <button
             type="button"
             onClick={onNew}
-            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-accent hover:bg-accent-soft"
+            className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[14.5px] font-medium text-accent hover:bg-accent-soft"
           >
             <span aria-hidden className="text-[15px] leading-none">+</span> New ticket
           </button>
@@ -97,7 +97,7 @@ export function TicketInput({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="subject" className="text-[12.5px] font-medium text-ink-2">
+        <label htmlFor="subject" className="text-[14px] font-medium text-ink-2">
           Subject <span className="font-normal text-ink-3">optional</span>
         </label>
         <input
@@ -105,13 +105,13 @@ export function TicketInput({
           value={subject}
           readOnly={readOnly}
           onChange={(e) => onSubject(e.target.value)}
-          className={`${FIELD} h-9 bg-surface`}
+          className={`${FIELD} h-11 bg-surface`}
           autoComplete="off"
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="body" className="text-[12.5px] font-medium text-ink-2">
+        <label htmlFor="body" className="text-[14px] font-medium text-ink-2">
           Body
         </label>
         <div className="relative rounded-md bg-surface">
@@ -139,12 +139,12 @@ export function TicketInput({
           />
         </div>
         {bodyError && (
-          <p id="body-error" className="text-[13px] font-medium text-amber">
+          <p id="body-error" className="text-[14px] font-medium text-amber">
             Body required
           </p>
         )}
         {evidence.length > 0 && (
-          <p className="flex items-center gap-1.5 text-[12px] text-ink-3">
+          <p className="flex items-center gap-1.5 text-[13px] text-ink-3">
             <span className="inline-block h-2.5 w-4 rounded-[2px] bg-mark" /> guardrail evidence
           </p>
         )}
@@ -154,14 +154,14 @@ export function TicketInput({
         id="triage-btn"
         type="submit"
         aria-disabled={busy}
-        className="flex h-11 w-full items-center justify-center gap-3 rounded-md bg-accent-fill px-4 text-[14px] font-semibold text-accent-fill-ink transition-opacity hover:opacity-92 aria-disabled:cursor-progress aria-disabled:opacity-70"
+        className="flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-accent-fill px-4 text-[15.5px] font-semibold text-accent-fill-ink transition-opacity hover:opacity-92 aria-disabled:cursor-progress aria-disabled:opacity-70"
       >
         {busy ? "Triaging…" : "Triage ticket"}
-        <kbd className="num rounded border border-current/35 px-1.5 py-px text-[11px] font-normal">{SHORTCUT}</kbd>
+        <kbd className="rounded border border-current/35 px-1.5 py-px text-[12px] font-normal">{SHORTCUT}</kbd>
       </button>
 
       {/* Quiet example links (judges paste their own tickets). Fill only; never submit, no active state. */}
-      <p className="-mt-1 flex flex-wrap items-center gap-x-1 text-[13px] text-ink-3">
+      <p className="-mt-1 flex flex-wrap items-center gap-x-1 text-[14px] text-ink-3">
         <span className="mr-1">Try an example:</span>
         {SAMPLES.map((s, i) => (
           <span key={s.id} className="inline-flex items-center">

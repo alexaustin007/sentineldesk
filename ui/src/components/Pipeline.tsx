@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fmtMs, fmtSeconds, stageName } from "../lib/labels";
 import type { RunState } from "../lib/run";
 import { PIPELINE_STAGES, type PipelineStage } from "../types/triage";
-import { IconCheck, IconSpinner } from "./Icons";
+import { IconCheck, IconChevron, IconSpinner } from "./Icons";
 
 type StepStatus = "pending" | "active" | "done" | "stopped";
 interface Step {
@@ -90,19 +90,54 @@ export function Pipeline({ run }: { run: RunState }) {
             ? ["timed out after", fmtSeconds(run.elapsedMs)]
             : ["", "—"];
 
+  // Calm on first open: once a result is in, the step list collapses to one summary line.
+  const done = run.kind === "success";
+  const [expanded, setExpanded] = useState(false);
+  const runKey = run.kind === "success" ? run.runId : run.kind;
+  useEffect(() => setExpanded(false), [runKey]);
+
+  if (done && !expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-expanded={false}
+        className="-mx-2 flex h-10 items-center gap-2 rounded-lg px-2 text-left text-[14.5px] text-ink-2 hover:bg-surface-2 hover:text-ink"
+      >
+        <IconCheck className="text-ink-3" />
+        <span>
+          Completed in <span className="num font-medium text-ink">{totalText}</span> · {steps.length} step{steps.length === 1 ? "" : "s"}
+          {route && <span className="text-ink-3"> · {route} route</span>}
+        </span>
+        <IconChevron className="text-ink-3" />
+      </button>
+    );
+  }
+
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
         <span className="flex items-baseline gap-2">
-          <h2 className="label">Pipeline</h2>
+          {done ? (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              aria-expanded
+              className="flex items-center gap-1.5 text-[15px] font-semibold text-ink hover:text-ink-2"
+            >
+              Pipeline <IconChevron open />
+            </button>
+          ) : (
+            <h2 className="text-[15px] font-semibold text-ink">Pipeline</h2>
+          )}
           {route && (
-            <span className="num rounded-[3px] border border-field px-1.5 py-px text-[11px] text-ink-2" title={routeReasons}>
-              route: {route}
+            <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[12.5px] text-ink-2" title={routeReasons}>
+              {route} route
             </span>
           )}
         </span>
         <span className="flex items-baseline gap-2">
-          {totalNote && <span className={`text-[12px] ${run.kind === "loading" ? "text-ink-3" : "text-tone-high"}`}>{totalNote}</span>}
+          {totalNote && <span className={`text-[13px] ${run.kind === "loading" ? "text-ink-3" : "text-tone-high"}`}>{totalNote}</span>}
           <span className="num text-[18px] font-medium text-ink">{totalText}</span>
         </span>
       </div>
@@ -112,7 +147,7 @@ export function Pipeline({ run }: { run: RunState }) {
           const share = total && ms != null ? Math.max(2, (ms / total) * 100) : 0;
           const last = i === steps.length - 1;
           return (
-            <li key={s} className="relative grid grid-cols-[20px_minmax(0,1fr)] gap-x-3 pb-3 last:pb-0">
+            <li key={s} className="relative grid grid-cols-[20px_minmax(0,1fr)] gap-x-3 pb-3.5 last:pb-0">
               {!last && (
                 <span
                   aria-hidden
@@ -121,9 +156,9 @@ export function Pipeline({ run }: { run: RunState }) {
               )}
               <Marker st={st} />
               <div className="min-w-0">
-                <div className="flex h-5 items-center justify-between gap-2 text-[13px]">
+                <div className="flex h-5 items-center justify-between gap-2 text-[14.5px]">
                   <span className={st === "pending" ? "text-ink-3" : "font-medium text-ink"}>{stageName(s)}</span>
-                  <span className={`num text-[12.5px] ${st === "stopped" ? "text-tone-high" : "text-ink-2"}`}>
+                  <span className={`num text-[14px] ${st === "stopped" ? "text-tone-high" : "text-ink-2"}`}>
                     {ms != null ? fmtMs(ms) : st === "stopped" ? "stopped" : st === "active" ? "…" : ""}
                   </span>
                 </div>

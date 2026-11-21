@@ -87,7 +87,7 @@ const CASES: Case[] = [
   { id: "a", title: "A · Escalate (red) · VPN outage, draft: null", run: success(vpnOutage) },
   { id: "b", title: "B · Auto-draft (green) · German billing", run: success(deBilling) },
   { id: "c", title: "C · Human review (amber) · knowledge gap · no subject", run: success(knowledgeGap) },
-  { id: "d", title: "D · Human review (amber) · injection attempt", run: success(injection) },
+  { id: "d", title: "D · Human review (amber) · injection attempt, blocked before drafting", run: success(injection) },
   {
     id: "e",
     title: "E · Human review (amber) · deep route · queue disagreement · removed claim · reason without code · precedent without lang/subject",

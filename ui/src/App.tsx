@@ -76,7 +76,7 @@ export function App() {
               e.preventDefault();
               go("/");
             }}
-            className="flex items-center gap-2.5 text-[15px] font-semibold tracking-[-0.01em] text-ink"
+            className="flex items-center gap-2.5 text-[16px] font-semibold text-ink"
           >
             <svg aria-hidden viewBox="0 0 20 20" width="20" height="20" className="text-ink">
               <rect x="1" y="1" width="18" height="18" rx="4" fill="currentColor" />
@@ -94,7 +94,7 @@ export function App() {
                   e.preventDefault();
                   go(t.route);
                 }}
-                className={`-mb-px flex items-center border-b-2 px-3 text-[13.5px] font-medium ${
+                className={`-mb-px flex items-center border-b-2 px-3.5 text-[15px] font-medium ${
                   route === t.route ? "border-accent text-ink" : "border-transparent text-ink-3 hover:text-ink"
                 }`}
               >
@@ -102,14 +102,14 @@ export function App() {
               </a>
             ))}
             {route === "/dev/states" && (
-              <span aria-current="page" className="num -mb-px flex items-center border-b-2 border-accent px-3 text-[12px] text-ink">
+              <span aria-current="page" className="mono -mb-px flex items-center border-b-2 border-accent px-3 text-[13px] text-ink">
                 /dev/states
               </span>
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span
-              className="num flex h-6 items-center gap-1.5 rounded-full border border-line-strong px-2.5 text-[11.5px] text-ink-2"
+              className="flex h-7 items-center gap-1.5 rounded-full bg-surface-2 px-3 text-[13px] text-ink-2"
               title={USE_MOCK ? "VITE_USE_MOCK=true" : "POST /api/triage"}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${USE_MOCK ? "bg-ink-4" : "bg-tone-low"}`} />

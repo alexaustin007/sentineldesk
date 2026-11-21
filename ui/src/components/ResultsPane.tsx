@@ -36,7 +36,7 @@ function Success({ run }: { run: Extract<RunState, { kind: "success" }> }) {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const { res } = run;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* Sections arrive in reading order (B2): decision, classification, draft, evidence. */}
       <Reveal i={0}>
         <EscalationBanner res={res} />
@@ -55,10 +55,10 @@ function Success({ run }: { run: Extract<RunState, { kind: "success" }> }) {
 }
 
 const GHOSTS = [
-  ["Decision", "h-28"],
-  ["Classification", "h-36"],
-  ["Draft", "h-40"],
-  ["Precedents", "h-32"],
+  ["Decision", "h-32"],
+  ["Classification", "h-40"],
+  ["Draft reply", "h-48"],
+  ["Precedents", "h-36"],
 ] as const;
 
 function Reveal({ i, children }: { i: number; children: ReactNode }) {
@@ -71,11 +71,11 @@ function Reveal({ i, children }: { i: number; children: ReactNode }) {
 
 function Loading() {
   return (
-    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Triaging ticket">
+    <div className="flex flex-col gap-6" aria-busy="true" aria-label="Triaging ticket">
       {GHOSTS.map(([g, h], i) => (
-        <div key={g} className={`rise rounded-lg border border-line bg-surface ${h} px-5 py-3`} style={{ animationDelay: `${i * 120}ms` }}>
-          <span className="label !text-ink-3">{g}</span>
-          <div className="mt-4 space-y-2.5">
+        <div key={g} className={`rise rounded-xl border border-line bg-surface ${h} px-6 py-5`} style={{ animationDelay: `${i * 120}ms` }}>
+          <span className="heading !text-ink-3">{g}</span>
+          <div className="mt-4 space-y-3">
             <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-surface-2" />
             <div className="h-2.5 w-1/2 animate-pulse rounded-full bg-surface-2" />
             {i > 0 && <div className="h-2.5 w-1/3 animate-pulse rounded-full bg-surface-2" />}
@@ -88,20 +88,20 @@ function Loading() {
 
 function Failure({ title, detail, code, onRetry }: { title: string; detail: string; code: string; onRetry: () => void }) {
   return (
-    <section role="alert" className="relative overflow-hidden rounded-lg border border-line bg-surface py-5 pr-5 pl-7">
+    <section role="alert" className="relative overflow-hidden rounded-xl border border-line bg-surface py-6 pr-6 pl-8">
       <span aria-hidden className="absolute inset-y-0 left-0 w-1.5 bg-ink-3" />
       <p className="label">Triage did not complete</p>
-      <p className="mt-1.5 text-[18px] font-semibold text-ink">{title}</p>
-      <p className="mt-1 text-[14px] text-ink-2">{detail}</p>
-      <div className="mt-4 flex items-center gap-4">
+      <p className="mt-1 text-[20px] font-semibold text-ink">{title}</p>
+      <p className="mt-1.5 text-[15px] text-ink-2">{detail}</p>
+      <div className="mt-5 flex items-center gap-4">
         <button
           type="button"
           onClick={onRetry}
-          className="h-9 rounded-md border border-field bg-surface px-4 text-[13.5px] font-semibold text-ink hover:border-ink-2"
+          className="h-10 rounded-lg border border-field bg-surface px-4 text-[14.5px] font-semibold text-ink hover:border-ink-2"
         >
           Retry
         </button>
-        <span className="num text-[12px] text-ink-3">{code}</span>
+        <span className="mono text-[13px] text-ink-3">{code}</span>
       </div>
     </section>
   );

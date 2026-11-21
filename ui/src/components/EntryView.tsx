@@ -13,8 +13,8 @@ export function EntryView(p: {
   readOnly?: boolean;
 }) {
   return (
-    <div className="rise mx-auto w-full max-w-[640px] px-6 pt-[8vh] pb-16">
-      <div className="rounded-xl border border-line bg-surface p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
+    <div className="rise mx-auto w-full max-w-[680px] px-6 pt-[8vh] pb-16">
+      <div className="rounded-2xl border border-line bg-surface p-7 shadow-[0_1px_3px_rgb(0_0_0/0.05)]">
         <TicketInput
           variant="entry"
           subject={p.subject}

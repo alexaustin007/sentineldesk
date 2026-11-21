@@ -39,7 +39,8 @@ function Badge({ status }: { status: EscalationStatus }) {
 export function EscalationBanner({ res }: { res: TriageResponse }) {
   const status = normalizeStatus(res.escalation?.status);
   const escalated = status === "escalate";
-  const [whyOpen, setWhyOpen] = useState(status !== "auto_draft");
+  // Collapsed in every state: the reason line already says why (calm on first open).
+  const [whyOpen, setWhyOpen] = useState(false);
   const [ackAt, setAckAt] = useState<Date | null>(null);
   const tone = TONE[status];
 
@@ -58,25 +59,23 @@ export function EscalationBanner({ res }: { res: TriageResponse }) {
   const cost = fmtCost(res.usage?.estimated_cost_usd);
 
   return (
-    <section aria-label="Escalation decision" className="relative overflow-hidden rounded-lg border border-line bg-surface">
+    <section aria-label="Escalation decision" className="relative overflow-hidden rounded-xl border border-line bg-surface">
       <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${tone.stripe}`} />
-      <div className={`${tone.tint} pl-6`}>
-        <div className="flex items-start gap-4 py-4 pr-5">
+      <div className={`${tone.tint} py-5 pr-6 pl-7`}>
+        <div className="flex items-start gap-4">
           <Badge status={status} />
           <div className="min-w-0 flex-1">
-            <p className={`text-[20px] leading-tight font-semibold tracking-[-0.01em] ${tone.text}`} role="status">
+            <p className={`text-[22px] leading-tight font-semibold ${tone.text}`} role="status">
               {STATUS_TEXT[status]}
             </p>
             {reasons.length ? (
-              <ul className="mt-1.5 space-y-1">
+              <ul className="mt-2 space-y-1.5">
                 {reasons.map((r, i) => {
                   const tag = reasonTag(r.code);
                   return (
-                    <li key={i} className="flex items-baseline gap-2 text-[14.5px] font-medium text-ink">
+                    <li key={i} className="flex items-baseline gap-2.5 text-[16px] leading-snug text-ink">
                       {tag && (
-                        <span className="num shrink-0 rounded-[3px] border border-field bg-surface px-1.5 py-px text-[11px] font-normal text-ink-2">
-                          {tag}
-                        </span>
+                        <span className="shrink-0 rounded-md bg-surface px-2 py-0.5 text-[12.5px] font-medium text-ink-2">{tag}</span>
                       )}
                       <span>{r.message}</span>
                     </li>
@@ -84,60 +83,54 @@ export function EscalationBanner({ res }: { res: TriageResponse }) {
                 })}
               </ul>
             ) : (
-              <p className="mt-1 text-[14.5px] font-medium text-ink">{fallbackLine}</p>
+              <p className="mt-2 text-[16px] text-ink">{fallbackLine}</p>
             )}
             {escalated && res.classification?.queue?.label && (
-              <p className="mt-1 text-[13.5px] text-ink-2">Paging {res.classification.queue.label} on-call</p>
+              <p className="mt-1.5 text-[14.5px] text-ink-2">Paging {res.classification.queue.label} on-call</p>
             )}
             {unique.map((e) => (
-              <p key={e} className="mt-2 border-l-2 border-line-strong pl-2.5 text-[13.5px] text-ink-2 italic">
+              <p key={e} className="mt-3 border-l-2 border-line-strong pl-3 text-[14.5px] text-ink-2 italic">
                 “{e}”
               </p>
             ))}
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px] text-ink-2">
+              {!res.input?.language_missing && (
+                <span>
+                  <span className="mono">{langCode(res.input?.language_detected)}</span>
+                  {res.input?.language_supported === false && <span className="text-ink-3"> (unsupported)</span>}
+                </span>
+              )}
+              {route && <span>{route} route</span>}
+              <span className="num">{fmtSeconds(res.latency_ms?.total ?? 0)}</span>
+              {cost && (
+                <span className="num" title={`${res.usage?.total_tokens ?? 0} tokens`}>
+                  {cost}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setWhyOpen((o) => !o)}
+                aria-expanded={whyOpen}
+                className="-ml-2 flex h-8 items-center gap-1.5 rounded-md px-2 font-medium text-ink hover:bg-surface/70"
+              >
+                Why? <IconChevron open={whyOpen} />
+              </button>
+            </div>
           </div>
           {escalated &&
             (ackAt ? (
-              <p className="num shrink-0 pt-1.5 text-[12px] text-ink-2">
+              <p className="num shrink-0 pt-1.5 text-[13px] text-ink-2">
                 Acknowledged by operator · {ackAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
               </p>
             ) : (
               <button
                 type="button"
                 onClick={() => setAckAt(new Date())}
-                className="h-8 shrink-0 rounded-md border border-field bg-surface px-3 text-[13px] font-medium text-ink hover:border-ink-2"
+                className="h-9 shrink-0 rounded-lg border border-field bg-surface px-3.5 text-[14px] font-medium text-ink hover:border-ink-2"
               >
                 Acknowledge
               </button>
             ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 border-t border-line py-1.5 pr-3 text-[12.5px] text-ink-2">
-          {!res.input?.language_missing && (
-            <span className="num">
-              <span className="text-ink-3">lang</span> {langCode(res.input?.language_detected)}
-              {res.input?.language_supported === false && <span className="text-ink-3"> (unsupported)</span>}
-            </span>
-          )}
-          {route && (
-            <span className="num">
-              <span className="text-ink-3">route</span> {route}
-            </span>
-          )}
-          <span className="num">
-            <span className="text-ink-3">end-to-end</span> {fmtSeconds(res.latency_ms?.total ?? 0)}
-          </span>
-          {cost && (
-            <span className="num" title={`${res.usage?.total_tokens ?? 0} tokens`}>
-              {cost}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setWhyOpen((o) => !o)}
-            aria-expanded={whyOpen}
-            className="ml-auto flex h-8 items-center gap-1.5 rounded px-2 font-medium text-ink hover:bg-surface/60"
-          >
-            Why? <IconChevron open={whyOpen} />
-          </button>
         </div>
       </div>
       {whyOpen && <WhyChecklist res={res} />}
@@ -149,22 +142,22 @@ function WhyChecklist({ res }: { res: TriageResponse }) {
   const checks = gateChecks(res);
   const { t, fallback } = thresholdsOf(res);
   return (
-    <div className="border-t border-line py-3 pr-5 pl-6">
-      <h3 className="label mb-1.5">Why · gate checks</h3>
-      <ul className="text-[13px]">
+    <div className="py-4 pr-6 pl-7">
+      <h3 className="label mb-2">Gate checks</h3>
+      <ul className="text-[14px]">
         {checks.map((c) => (
-          <li key={c.code} className="grid min-h-7 grid-cols-[18px_minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-2">
+          <li key={c.code} className="grid min-h-8 grid-cols-[20px_minmax(0,1fr)_minmax(0,1.2fr)] items-center gap-2">
             {c.pass ? <IconCheck className="text-ink-3" /> : <IconCross className="text-tone-high" />}
             <span className={c.pass ? "text-ink-2" : "font-semibold text-ink"}>{c.label}</span>
-            <span className={`num truncate text-right text-[12px] ${c.pass ? "text-ink-3" : "text-ink"}`} title={c.value}>
+            <span className={`num truncate text-right text-[13.5px] ${c.pass ? "text-ink-3" : "text-ink"}`} title={c.value}>
               {c.value}
             </span>
           </li>
         ))}
       </ul>
       {fallback && (
-        <p className="num mt-1 text-[12px] text-amber">
-          thresholds missing from response · using defaults {t.confidence.toFixed(2)} / {t.similarity.toFixed(2)}
+        <p className="num mt-1 text-[13px] text-amber">
+          Thresholds missing from response · using defaults {t.confidence.toFixed(2)} / {t.similarity.toFixed(2)}
         </p>
       )}
     </div>

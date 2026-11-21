@@ -26,7 +26,7 @@ Only laws that change a decision in this product are included. Each rule has a *
 | ID | Law | Rule | Check |
 |---|---|---|---|
 | C1 | Chunking / Miller's Law | Results come in at most 5 labelled sections. Show at most 5 precedents. | Count the sections and precedents. |
-| C2 | Law of Common Region | Each section sits inside one clearly bounded region with a small-caps label. | Every section has a visible boundary or background and a label. |
+| C2 | Law of Common Region | Each section sits inside one clearly bounded region with a sentence-case heading (no all caps). | Every section has a visible boundary or background and a label. |
 | C3 | Law of Proximity | Each confidence value sits right next to its label, and the reason sits right under the escalation status. | No value is detached from what it describes. |
 | C4 | Law of Similarity | All three confidence bars (type, queue, priority) look identical, so they're easy to compare. | Same height, scale, threshold tick and number format for all three. |
 | C5 | Law of Uniform Connectedness | A citation `[TKT-x]` in the draft is visibly connected to its precedent: hovering or clicking highlights both. | Clicking a citation scrolls to and highlights the matching precedent. |
