@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IconMoon, IconSun } from "./components/Icons";
 import { ToastHost } from "./components/Toast";
 import { USE_MOCK } from "./lib/api";
 import { ConsolePage } from "./pages/ConsolePage";
 import { DevStates } from "./pages/DevStates";
 import { MetricsPage } from "./pages/MetricsPage";
+
+import { STATUS_TEXT, normalizeStatus, fmtSeconds } from "./lib/labels";
+import type { TriageResponse } from "./types/triage";
 
 type Route = "/" | "/metrics" | "/dev/states";
 
@@ -65,6 +68,10 @@ const TABS: { route: Route; label: string }[] = [
 
 export function App() {
   const [route, go] = useRoute();
+  const [latest, setLatest] = useState<{ outcome: string; ms: number } | null>(null);
+  const recordCompletion = useCallback((res: TriageResponse) => {
+    if (!USE_MOCK) setLatest({ outcome: STATUS_TEXT[normalizeStatus(res.escalation.status)], ms: res.latency_ms.total });
+  }, []);
   const [dark, toggleTheme] = useTheme();
   return (
     <div className="min-h-screen">
@@ -126,9 +133,17 @@ export function App() {
           </div>
         </div>
       </header>
-      {route === "/" && <ConsolePage />}
+      {route === "/" && <ConsolePage onCompleted={recordCompletion} />}
       {route === "/metrics" && (
         <div className="px-6 py-6">
+          {!USE_MOCK && (
+            <section className="mx-auto mb-6 max-w-[880px] rounded-lg border border-line bg-surface p-4">
+              <h2 className="font-semibold">Latest live ticket in this tab</h2>
+              <p className="mt-1 text-sm text-ink-2">
+                {latest ? `${latest.outcome} · ${fmtSeconds(latest.ms)} to triage` : "Submit a ticket in Console to see its outcome and processing time here."}
+              </p>
+            </section>
+          )}
           <MetricsPage />
         </div>
       )}
