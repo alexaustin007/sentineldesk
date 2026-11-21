@@ -1,3 +1,7 @@
 /data/
 *.[Cc][Ss][Vv]
 .venv/
+*.joblib
+*.pyc
+__pycache__/
+holdout_predictions.json
