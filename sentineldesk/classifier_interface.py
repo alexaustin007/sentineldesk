@@ -6,6 +6,7 @@ development. It does not train anything.
 """
 
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any, Protocol
 
 from sentineldesk.config import DEFAULT_LABEL_OPTIONS, LABEL_HEADS
@@ -26,6 +27,24 @@ class ProbabilisticModel(Protocol):
     classes_: Sequence[Any]
 
     def predict_proba(self, inputs: Sequence[Any]) -> Any: ...
+
+
+def load_team_classifier(model_dir: Path | None = None) -> "TicketClassifier | None":
+    """The trained classifier from classification/, or None until its models exist.
+
+    Wraps the three calibrated pipelines from `classification.classify.load_models()`
+    so the workflow gets full label probabilities, not just the top label. Train
+    them with `python classification/classify.py`.
+    """
+    try:
+        from classification.classify import load_models
+    except ImportError:
+        return None
+    try:
+        models = load_models() if model_dir is None else load_models(model_dir)
+    except FileNotFoundError:
+        return None
+    return SklearnClassifierAdapter(models)
 
 
 def ticket_record(subject: str, body: str) -> dict[str, str]:

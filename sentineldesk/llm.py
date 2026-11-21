@@ -96,18 +96,36 @@ class LLMProvider(Protocol):
 
 
 class GeminiProvider:
-    """Gemini through the official Google Gen AI SDK (`google-genai`)."""
+    """Gemini through the official Google Gen AI SDK (`google-genai`).
 
-    name = "gemini"
+    It signs in one of two ways:
+    - Gemini Developer API: an API key from Google AI Studio.
+    - Google Cloud (Vertex AI / Gemini Enterprise Agent Platform), for Google Cloud
+      credits: Application Default Credentials plus a project and location. Run
+      `gcloud auth application-default login` once to create the credentials.
+    """
 
     def __init__(
         self,
         api_key: str | None = None,
         settings: dict[str, ModelSettings] | None = None,
+        enterprise: bool = False,
     ) -> None:
         from google import genai  # imported here so mock mode works without the SDK
 
-        self._client = genai.Client(api_key=api_key)
+        if enterprise:
+            project = os.getenv("GOOGLE_CLOUD_PROJECT")
+            if not project:
+                raise ValueError("Google Cloud mode needs GOOGLE_CLOUD_PROJECT.")
+            # Gemini 3 models are served from the global endpoint by default.
+            location = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
+            self._client = genai.Client(
+                enterprise=True, project=project, location=location
+            )
+            self.name = "gemini-enterprise"
+        else:
+            self._client = genai.Client(api_key=api_key)
+            self.name = "gemini"
         self._settings = settings or load_model_settings()
 
     def generate(self, request: LLMRequest) -> LLMResponse:
@@ -198,20 +216,40 @@ class MockLLMProvider:
         )
 
 
-def create_llm_provider() -> LLMProvider:
-    """Gemini when GEMINI_API_KEY (or GOOGLE_API_KEY) is set, otherwise the mock.
+def choose_provider_kind() -> str:
+    """Which provider the environment asks for: "enterprise", "gemini", or "mock".
 
-    Set SENTINEL_LLM_PROVIDER to "mock" or "gemini" to force a choice.
+    - GOOGLE_GENAI_USE_ENTERPRISE=true: Gemini on Google Cloud (Application Default
+      Credentials, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION).
+    - GEMINI_API_KEY or GOOGLE_API_KEY: the Gemini Developer API.
+    - Neither: the offline mock.
+    SENTINEL_LLM_PROVIDER set to "enterprise", "gemini", or "mock" overrides this.
     """
-    choice = os.getenv("SENTINEL_LLM_PROVIDER", "auto").lower()
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if choice == "mock" or (choice == "auto" and not api_key):
-        return MockLLMProvider()
-    if choice in {"auto", "gemini"}:
-        return GeminiProvider(api_key=api_key)
-    raise ValueError(
-        f"Unknown SENTINEL_LLM_PROVIDER '{choice}'. Use auto, gemini, or mock."
-    )
+    choice = os.getenv("SENTINEL_LLM_PROVIDER", "auto").strip().lower()
+    if choice in {"enterprise", "gemini", "mock"}:
+        return choice
+    if choice != "auto":
+        raise ValueError(
+            f"Unknown SENTINEL_LLM_PROVIDER '{choice}'. "
+            "Use auto, enterprise, gemini, or mock."
+        )
+    if os.getenv("GOOGLE_GENAI_USE_ENTERPRISE", "").strip().lower() in {"true", "1"}:
+        return "enterprise"
+    if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+        return "gemini"
+    return "mock"
+
+
+def create_llm_provider() -> LLMProvider:
+    """Build the provider that `choose_provider_kind` picks from the environment."""
+    kind = choose_provider_kind()
+    if kind == "enterprise":
+        return GeminiProvider(enterprise=True)
+    if kind == "gemini":
+        return GeminiProvider(
+            api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        )
+    return MockLLMProvider()
 
 
 def estimate_tokens(text: str) -> int:

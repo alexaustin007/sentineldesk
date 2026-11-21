@@ -75,14 +75,29 @@ Run the demo on sample tickets:
 python -m sentineldesk.demo
 ```
 
-Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. Without a Gemini key, it uses a mock LLM.
+Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. It uses the trained classifier from `python classification/classify.py` when its models exist, and a keyword mock otherwise. Without Gemini credentials, it uses a mock LLM.
+
+To run Gemini on Google Cloud credits, sign in once with Application Default Credentials and set the Google Cloud variables listed below:
+
+```bash
+gcloud auth application-default login
+```
+
+Then confirm that both model tiers answer:
+
+```bash
+python -m sentineldesk.check_llm
+```
 
 ### Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | not set | Turns on Gemini. Without it the mock LLM runs. |
-| `SENTINEL_LLM_PROVIDER` | `auto` | Set to `gemini` or `mock` to force one. |
+| `GOOGLE_GENAI_USE_ENTERPRISE` | not set | Set to `true` to run Gemini on Google Cloud (Vertex AI / Gemini Enterprise Agent Platform) with Application Default Credentials, for Google Cloud credits. |
+| `GOOGLE_CLOUD_PROJECT` | not set | Google Cloud project ID, required in Google Cloud mode |
+| `GOOGLE_CLOUD_LOCATION` | `global` | Google Cloud location for Gemini |
+| `GEMINI_API_KEY` | not set | Gemini Developer API key from Google AI Studio. Without any Gemini credentials the mock LLM runs. |
+| `SENTINEL_LLM_PROVIDER` | `auto` | Set to `enterprise`, `gemini`, or `mock` to force one. |
 | `SENTINEL_FAST_MODEL` | `gemini-3.5-flash-lite` | Routine drafts |
 | `SENTINEL_DEEP_MODEL` | `gemini-3.8-flash` | Adversarial review, complex drafts, attachments |
 | `SENTINEL_FAST_INPUT_PRICE`, `SENTINEL_FAST_OUTPUT_PRICE` | `0.30`, `2.50` | USD per million tokens, used for cost estimates |
