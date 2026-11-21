@@ -36,6 +36,26 @@ export function parseMetrics(raw: unknown): Metrics {
 
   const pipe = isObj(raw.pipeline) ? raw.pipeline : null;
   const hpi = raw.high_priority_incident;
+  const rate = (v: unknown) => (isNum(v) ? v : null);
+  const dq = raw.drafts;
+  const drafts =
+    isObj(dq) && [dq.citations_valid_rate, dq.language_match_rate, dq.removed_claims_rate].some(isNum)
+      ? { citations_valid_rate: rate(dq.citations_valid_rate), language_match_rate: rate(dq.language_match_rate), removed_claims_rate: rate(dq.removed_claims_rate) }
+      : null;
+  const heads = Object.fromEntries(
+    HEADS.map((h) => {
+      const m = raw.heads[h];
+      const l = m.macro_f1_by_language;
+      return [
+        h,
+        {
+          ...m,
+          calibration_error: isNum(m.calibration_error) ? m.calibration_error : undefined,
+          macro_f1_by_language: isObj(l) && isNum(l.en) && isNum(l.de) ? { en: l.en, de: l.de } : undefined,
+        },
+      ];
+    }),
+  ) as Metrics["heads"];
   const optNum = (v: unknown) => (isNum(v) ? v : undefined);
   const optStr = (v: unknown) => (typeof v === "string" ? v : null);
   /** { key: number } with non-numbers dropped; null when nothing usable is left. */
@@ -46,6 +66,9 @@ export function parseMetrics(raw: unknown): Metrics {
   };
   return {
     ...(raw as unknown as Metrics),
+    heads,
+    calibration_error: isNum(raw.calibration_error) ? raw.calibration_error : undefined,
+    drafts,
     high_priority_incident:
       isObj(hpi) && isNum(hpi.caught) && isNum(hpi.total) && hpi.total > 0
         ? { caught: hpi.caught, total: hpi.total, escalation_rate: optNum(hpi.escalation_rate) }

@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from "react";
+import { findCitations } from "../lib/citations";
 import { fmtScore, langCode, normalizeStatus } from "../lib/labels";
 import type { Precedent, TriageResponse } from "../types/triage";
 import { IconCopy } from "./Icons";
 import { Section } from "./Section";
 import { toast } from "./Toast";
 
-const CITE = /\[(TKT-\d{5})\]/g;
 
 export function DraftReply({
   res,
@@ -117,17 +117,16 @@ function renderWithCitations(
 ) {
   const parts: ReactNode[] = [];
   let last = 0;
-  for (const m of text.matchAll(CITE)) {
-    const i = m.index ?? 0;
-    if (i > last) parts.push(text.slice(last, i));
-    parts.push(<CitationChip key={i} id={m[1]} p={byId.get(m[1])} onCite={onCite} onHover={onHover} />);
-    last = i + m[0].length;
+  for (const c of findCitations(text)) {
+    if (c.index > last) parts.push(text.slice(last, c.index));
+    parts.push(<CitationChip key={c.index} id={c.id} p={byId.get(c.id)} onCite={onCite} onHover={onHover} />);
+    last = c.index + c.length;
   }
   parts.push(text.slice(last));
   return parts;
 }
 
-/** `[TKT-xxxxx]` stays visible as a chip. Hover previews, click scrolls to + highlights the precedent (C5). */
+/** `[TKT-xxxxx]` (or `[TKT-V5-xxxxx]`) stays visible as a chip. Hover previews, click scrolls to + highlights the precedent (C5). */
 function CitationChip({
   id,
   p,

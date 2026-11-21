@@ -78,7 +78,7 @@ The UI shows labels exactly as the hackathon spec names them. Values were checke
 | `input.language_detected`, `precedents[].language`, `draft.language` | `en` · `de` | Shown as `EN` / `DE`. There is no language picker anywhere (D4). |
 | `escalation.status` | `auto_draft` → **"Auto-Draft Ready"** (green) · `human_review` → **"Needs Human Review"** (amber) · `escalate` → **"Escalate to On-Call Engineer"** (red) | Green and red use the spec's exact wording; amber is PR #5's middle state. If the value is missing or unknown, treat it as `escalate` (fail safe). |
 | `escalation.reasons[].code` | `HIGH_PRIORITY_INCIDENT` · `CRITICAL_INCIDENT_RISK` · `LOW_CONFIDENCE` · `LOW_MARGIN` · `LOW_SIMILARITY` · `UNSUPPORTED_REQUEST` · `UNSUPPORTED_LANGUAGE` · `PROMPT_INJECTION` · `VERIFICATION_FAILED` · `OTHER` | Best-effort tags, used for icons and the "Why?" checklist only. Always render `message`. |
-| `precedents[].ticket_id` | `TKT-` + 5 digits, e.g. `TKT-01842` | ID format from the spec's split snippet. |
+| `precedents[].ticket_id` | `TKT-` + 5 digits (`TKT-01842`) **or** a source prefix + 5 digits (`TKT-V5-00042`) | Since team PR #7, `prepare_data.py` merges several source files and prefixes IDs per source. Citations use the same IDs in brackets; the UI matches both forms. |
 
 ### 3.2 Mapping from PR #5's `TriageResult.to_dict()`
 
