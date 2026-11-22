@@ -1,6 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/triage", "destination": "https://unanaemic-bernardo-unpraying.ngrok-free.dev/api/triage" },
     { "source": "/metrics", "destination": "/index.html" },
     { "source": "/dev/states", "destination": "/index.html" }
   ]

@@ -20,13 +20,22 @@ def test_mock_without_credentials() -> None:
     assert choose_provider_kind() == "mock"
 
 
+def test_credentials_alone_keep_mock_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_GENAI_USE_ENTERPRISE", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    assert choose_provider_kind() == "mock"
+
+
 def test_api_key_selects_developer_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SENTINEL_LLM_PROVIDER", "auto")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
     assert choose_provider_kind() == "gemini"
 
 
 def test_enterprise_flag_wins_over_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SENTINEL_LLM_PROVIDER", "auto")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setenv("GOOGLE_GENAI_USE_ENTERPRISE", "true")
 
