@@ -81,9 +81,9 @@ Run the demo on sample tickets:
 python -m sentineldesk.demo
 ```
 
-Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. It uses the trained classifier from `python classification/classify.py` when its models exist, and a keyword mock otherwise. Without Gemini credentials, it uses a mock LLM.
+Without the prepared split, the demo falls back to 16 mock tickets with offline TF-IDF retrieval. It uses the trained classifier from `python classification/classify.py` when its models exist, and a keyword mock otherwise. The LLM defaults to an offline mock.
 
-To run Gemini on Google Cloud credits, sign in once with Application Default Credentials and set the Google Cloud variables listed below:
+To run Gemini on Google Cloud credits, sign in once with Application Default Credentials and set `SENTINEL_LLM_PROVIDER=enterprise` and the Google Cloud project and location variables below:
 
 ```bash
 gcloud auth application-default login
@@ -102,8 +102,8 @@ python -m sentineldesk.check_llm
 | `GOOGLE_GENAI_USE_ENTERPRISE` | not set | Set to `true` to run Gemini on Google Cloud (Vertex AI / Gemini Enterprise Agent Platform) with Application Default Credentials, for Google Cloud credits. |
 | `GOOGLE_CLOUD_PROJECT` | not set | Google Cloud project ID, required in Google Cloud mode |
 | `GOOGLE_CLOUD_LOCATION` | `global` | Google Cloud location for Gemini |
-| `GEMINI_API_KEY` | not set | Gemini Developer API key from Google AI Studio. Without any Gemini credentials the mock LLM runs. |
-| `SENTINEL_LLM_PROVIDER` | `auto` | Set to `enterprise`, `gemini`, or `mock` to force one. |
+| `GEMINI_API_KEY` | not set | Gemini Developer API key from Google AI Studio. Set `SENTINEL_LLM_PROVIDER=gemini` to use it. |
+| `SENTINEL_LLM_PROVIDER` | `mock` | Live calls require an explicit `enterprise`, `gemini`, or `auto` setting. |
 | `SENTINEL_FAST_MODEL` | `gemini-3.5-flash-lite` | Routine drafts |
 | `SENTINEL_DEEP_MODEL` | `gemini-3.8-flash` | Adversarial review, complex drafts, attachments |
 | `SENTINEL_FAST_INPUT_PRICE`, `SENTINEL_FAST_OUTPUT_PRICE` | `0.30`, `2.50` | USD per million tokens, used for cost estimates |
@@ -193,6 +193,6 @@ Save the fitted pipeline locally alongside the matching classifiers (for example
 
 From the repo root, run `python -m scripts.evaluate_holdout` after preparing the full split. It fits the team's classifier on the historical training set, predicts from holdout subject and body, then joins the hidden labels by ticket ID to score predictions. The generated `ui/public/metrics.json` contains only aggregate counts and scores. Build the frontend after generating the report so Vite includes it.
 
-For the Vercel demo, build with `VITE_USE_MOCK=false` and deploy the contents of `ui/dist/` with the rewrites in `ui/vercel.json`. The backend laptop and its tunnel must stay online. The Metrics page shows the last successful live decision in the current tab. Its classifier benchmark updates when a new evaluation report is published.
+Production frontend builds use mock responses by default. A live deployment requires `VITE_USE_MOCK=false` and an explicitly configured backend route. In live mode, the Metrics page shows the last successful live decision in the current tab. Its classifier benchmark updates when a new evaluation report is published.
 
 To enable independent draft review on a backend, set `SENTINEL_INDEPENDENT_DRAFT_REVIEW=true` before starting FastAPI. It defaults to off. For an otherwise auto-ready draft, a separate deep-tier Gemini call checks the reply against the specific historical tickets it cites. A rejection, timeout, or unusable verdict sends the draft to human review. Urgent escalations bypass the reviewer. Successful reviewer calls contribute to the existing token, cost and timing fields. Restart with the variable unset to restore the default. The published benchmark predates this optional step.

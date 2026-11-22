@@ -5,7 +5,7 @@ Two tiers keep compute proportional to risk:
 - "deep": Gemini Flash runs the adversarial review, complex drafts, and attachments.
 
 Model names and prices come from environment variables, so they can change without
-code edits. Without an API key, `create_llm_provider` returns the offline mock.
+code edits. The provider defaults to the offline mock.
 """
 
 from __future__ import annotations
@@ -244,13 +244,10 @@ class MockLLMProvider:
 def choose_provider_kind() -> str:
     """Which provider the environment asks for: "enterprise", "gemini", or "mock".
 
-    - GOOGLE_GENAI_USE_ENTERPRISE=true: Gemini on Google Cloud (Application Default
-      Credentials, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION).
-    - GEMINI_API_KEY or GOOGLE_API_KEY: the Gemini Developer API.
-    - Neither: the offline mock.
-    SENTINEL_LLM_PROVIDER set to "enterprise", "gemini", or "mock" overrides this.
+    The default is "mock". Explicit "auto" mode checks the Google Cloud flag,
+    then the Gemini API key, and falls back to the offline mock.
     """
-    choice = os.getenv("SENTINEL_LLM_PROVIDER", "auto").strip().lower()
+    choice = os.getenv("SENTINEL_LLM_PROVIDER", "mock").strip().lower()
     if choice in {"enterprise", "gemini", "mock"}:
         return choice
     if choice != "auto":
